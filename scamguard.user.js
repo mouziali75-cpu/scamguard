@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      2.2
+// @version      2.3
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -39,7 +39,7 @@
   ];
 
   // ============================================
-  //  WARNING IMAGE (leave '' to use emoji fallback)
+  //  WARNING IMAGE (used for ALL categories, leave '' for emoji fallback)
   // ============================================
   const warningImageUrl = 'https://i.postimg.cc/BZ84GV46/Photoroom-20260721-203154.png';
 
@@ -116,10 +116,11 @@
       background:rgba(0,0,0,0.6);z-index:10000000;
       display:flex;align-items:center;justify-content:center;
       font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+      overflow-y:auto;box-sizing:border-box;padding:20px 0;
     `;
     modal.innerHTML = `
       <div style="background:#16233b;border-radius:16px;padding:24px;width:85%;max-width:340px;
-                  border:1px solid rgba(100,181,246,0.3);">
+                  border:1px solid rgba(100,181,246,0.3);margin:auto;">
         ${innerHtml}
       </div>
     `;
@@ -218,10 +219,10 @@
   fab.onclick = openReportModal;
   window.addEventListener('DOMContentLoaded', () => document.body.appendChild(fab));
 
-  // ---- Warning overlay for flagged sites ----
+  // ---- Warning overlay for flagged sites (all categories, scrollable) ----
   if (detectedCategory) {
     const style = categoryStyles[detectedCategory];
-    const imageHtml = detectedCategory === 'phishing' && warningImageUrl
+    const imageHtml = warningImageUrl
       ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
       : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
 
@@ -230,8 +231,9 @@
       position:fixed;top:0;left:0;width:100%;height:100%;
       background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
       color:white;z-index:999999;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;padding:24px;
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+      padding:40px 24px;overflow-y:auto;box-sizing:border-box;
     `;
     overlay.innerHTML = `
       ${imageHtml}
@@ -245,11 +247,11 @@
       <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
       <button id="sg-leave" style="padding:13px 32px;margin-bottom:10px;background:${style.accent};
               color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
-      <button id="sg-continue" style="padding:11px 28px;margin-bottom:10px;background:transparent;color:#a8c8ea;
+      <button id="sg-continue" style="padding:11px 28px;margin-bottom:14px;background:transparent;color:#a8c8ea;
               border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
         Continue anyway
       </button>
-      <button id="sg-report-btn" style="padding:9px 20px;background:transparent;color:#a8c8ea;
+      <button id="sg-report-btn" style="padding:9px 20px;margin-bottom:20px;background:transparent;color:#a8c8ea;
               border:none;font-size:13px;text-decoration:underline;">
         🚩 Report a different issue with this site
       </button>
