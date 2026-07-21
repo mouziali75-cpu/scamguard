@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      2.3
+// @version      2.4
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -155,13 +155,12 @@
     };
   }
 
-  // ---- Step 2: URL / domain ----
+  // ---- Step 2: URL / domain (always starts empty) ----
   function showStepUrl(category) {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 4px;font-size:17px;">Enter the link or domain</h3>
       <p style="color:#7fa8d9;font-size:13px;margin:0 0 16px;">${categoryStyles[category].label}</p>
-      <input id="sg-url" type="text" placeholder="e.g. roblox.com.nf or full link"
-        value="${location.href}"
+      <input id="sg-url" type="text" placeholder="e.g. roblox.com.nf or https://..."
         style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
                background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
                color:white;font-size:13px;margin-bottom:16px;">
@@ -219,7 +218,7 @@
   fab.onclick = openReportModal;
   window.addEventListener('DOMContentLoaded', () => document.body.appendChild(fab));
 
-  // ---- Warning overlay for flagged sites (all categories, scrollable) ----
+  // ---- Warning overlay for flagged sites ----
   if (detectedCategory) {
     const style = categoryStyles[detectedCategory];
     const imageHtml = warningImageUrl
@@ -245,15 +244,15 @@
         </p>
       </div>
       <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
-      <button id="sg-leave" style="padding:13px 32px;margin-bottom:10px;background:${style.accent};
+      <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
               color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
-      <button id="sg-continue" style="padding:11px 28px;margin-bottom:14px;background:transparent;color:#a8c8ea;
+      <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
               border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
         Continue anyway
       </button>
-      <button id="sg-report-btn" style="padding:9px 20px;margin-bottom:20px;background:transparent;color:#a8c8ea;
-              border:none;font-size:13px;text-decoration:underline;">
-        🚩 Report a different issue with this site
+      <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+              color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+        🚩 Report a different issue
       </button>
     `;
     document.documentElement.appendChild(overlay);
