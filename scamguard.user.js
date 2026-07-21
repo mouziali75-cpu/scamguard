@@ -46,7 +46,7 @@
   // ============================================
   //  DISCORD WEBHOOK URL
   // ============================================
-  const webhookUrl = 'PASTE_YOUR_WEBHOOK_URL_HERE';
+  const webhookUrl = 'https://discord.com/api/webhooks/1529255203595878430/Sfl-UVmfYYbbQZJtwQvR0Tf272gpEAKHJ1Jz4PAXFVUf8aq7UcBXKjVjq2FVURPJUDXv';
 
   const suspiciousTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top', '.club'];
   const phishKeywords = [
