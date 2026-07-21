@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      2.4
+// @version      2.5
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -155,7 +155,7 @@
     };
   }
 
-  // ---- Step 2: URL / domain (always starts empty) ----
+  // ---- Step 2: URL / domain (always starts EMPTY) ----
   function showStepUrl(category) {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 4px;font-size:17px;">Enter the link or domain</h3>
@@ -256,7 +256,9 @@
       </button>
     `;
     document.documentElement.appendChild(overlay);
-    document.getElementById('sg-leave').onclick = () => history.back();
+    document.getElementById('sg-leave').onclick = () => {
+      window.location.href = 'https://www.google.com';
+    };
     document.getElementById('sg-continue').onclick = () => overlay.remove();
     document.getElementById('sg-report-btn').onclick = () => openReportModal();
   }
