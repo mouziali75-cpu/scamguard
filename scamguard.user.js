@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      2.5
+// @version      3.0
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -39,6 +39,24 @@
   ];
 
   // ============================================
+  //  TRUSTED / WELL-KNOWN DOMAINS
+  //  (Sites here will NEVER show the "unknown site" notice)
+  // ============================================
+  const trustedDomains = [
+    'google.com', 'youtube.com', 'gmail.com', 'facebook.com', 'instagram.com',
+    'whatsapp.com', 'twitter.com', 'x.com', 'reddit.com', 'wikipedia.org',
+    'roblox.com', 'discord.com', 'discordapp.com', 'steampowered.com',
+    'steamcommunity.com', 'epicgames.com', 'minecraft.net', 'ea.com',
+    'ubisoft.com', 'twitch.tv', 'tiktok.com', 'spotify.com', 'netflix.com',
+    'amazon.com', 'microsoft.com', 'apple.com', 'icloud.com', 'github.com',
+    'githubusercontent.com', 'stackoverflow.com', 'paypal.com', 'telegram.org',
+    'telegram.me', 't.me', 'linkedin.com', 'pinterest.com', 'snapchat.com',
+    'yahoo.com', 'bing.com', 'duckduckgo.com', 'cloudflare.com', 'imgur.com',
+    'postimg.cc', 'catbox.moe', 'bot-hosting.net', 'viayoo.com', 'mongodb.com',
+    'expo.dev', 'render.com', 'vercel.com', 'netlify.com',
+  ];
+
+  // ============================================
   //  WARNING IMAGE (used for ALL categories, leave '' for emoji fallback)
   // ============================================
   const warningImageUrl = 'https://i.postimg.cc/BZ84GV46/Photoroom-20260721-203154.png';
@@ -63,7 +81,8 @@
   const categoryStyles = {
     phishing:  { label: 'Phishing / Scam Site',        color: '#0d47a1', accent: '#2196f3', icon: '🛡️' },
     adult:     { label: 'Adult Content',                color: '#4a0d0d', accent: '#e53935', icon: '🔞' },
-    unwanted:  { label: 'Unwanted / Low-Quality Site',  color: '#3a3a1a', accent: '#fbc02d', icon: '⚠️' }
+    unwanted:  { label: 'Unwanted / Low-Quality Site',  color: '#3a3a1a', accent: '#fbc02d', icon: '⚠️' },
+    safe:      { label: 'Report as Safe / Well-known',  color: '#1b3a1b', accent: '#4caf50', icon: '✅' }
   };
 
   let detectedCategory = null;
@@ -82,19 +101,22 @@
   if (!detectedCategory && matches(adultDomains)) { detectedCategory = 'adult'; flags.push('This site is flagged as adult content'); }
   if (!detectedCategory && matches(unwantedDomains)) { detectedCategory = 'unwanted'; flags.push('This site is flagged as unwanted/low-quality content'); }
 
+  const isTrusted = matches(trustedDomains);
+  const isUnknown = !detectedCategory && !isTrusted;
+
   // ---- Webhook sender ----
   function sendReport(url, category, note) {
     if (!webhookUrl || webhookUrl.includes('PASTE_YOUR')) {
       alert('Webhook not configured yet.');
       return;
     }
-    const colorMap = { phishing: 2201331, adult: 15158332, unwanted: 16098851 };
+    const colorMap = { phishing: 2201331, adult: 15158332, unwanted: 16098851, safe: 5025616 };
     fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: '🚩 New Site Report',
+          title: category === 'safe' ? '✅ Suggested Trusted Domain' : '🚩 New Site Report',
           color: colorMap[category] || 15158332,
           fields: [
             { name: 'Category', value: categoryStyles[category].label },
@@ -156,11 +178,11 @@
   }
 
   // ---- Step 2: URL / domain (always starts EMPTY) ----
-  function showStepUrl(category) {
+  function showStepUrl(category, prefill) {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 4px;font-size:17px;">Enter the link or domain</h3>
       <p style="color:#7fa8d9;font-size:13px;margin:0 0 16px;">${categoryStyles[category].label}</p>
-      <input id="sg-url" type="text" placeholder="e.g. roblox.com.nf or https://..."
+      <input id="sg-url" type="text" placeholder="e.g. roblox.com.nf or https://..." value="${prefill || ''}"
         style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
                background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
                color:white;font-size:13px;margin-bottom:16px;">
@@ -191,6 +213,7 @@
         <button data-cat="phishing" style="padding:12px;background:#2196f3;color:white;border:none;border-radius:8px;font-size:14px;">🛡️ Phishing / Scam</button>
         <button data-cat="adult" style="padding:12px;background:#e53935;color:white;border:none;border-radius:8px;font-size:14px;">🔞 Adult Content</button>
         <button data-cat="unwanted" style="padding:12px;background:#fbc02d;color:#222;border:none;border-radius:8px;font-size:14px;">⚠️ Unwanted / Spam</button>
+        <button data-cat="safe" style="padding:12px;background:#4caf50;color:white;border:none;border-radius:8px;font-size:14px;">✅ Well-known / Safe Site</button>
       </div>
       <button id="sg-cancel" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
               border:1px solid rgba(168,200,234,0.4);border-radius:8px;">Cancel</button>
@@ -217,6 +240,41 @@
   `;
   fab.onclick = openReportModal;
   window.addEventListener('DOMContentLoaded', () => document.body.appendChild(fab));
+
+  // ---- Lightweight "unknown site" banner (non-blocking) ----
+  function showUnknownBanner() {
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;z-index:999997;
+      background:#1a2a3d;color:#cfe4ff;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+      font-size:13px;padding:10px 14px;box-sizing:border-box;
+      display:flex;align-items:center;justify-content:space-between;gap:8px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    `;
+    banner.innerHTML = `
+      <span style="flex:1;line-height:1.4;">⚠️ This site isn't in our known list yet. Be cautious.</span>
+      <button id="sg-unk-report" style="flex-shrink:0;padding:6px 10px;background:#e53935;color:white;
+              border:none;border-radius:6px;font-size:12px;">Report</button>
+      <button id="sg-unk-safe" style="flex-shrink:0;padding:6px 10px;background:#4caf50;color:white;
+              border:none;border-radius:6px;font-size:12px;">It's legit</button>
+      <button id="sg-unk-dismiss" style="flex-shrink:0;padding:6px 8px;background:transparent;color:#a8c8ea;
+              border:none;font-size:16px;">✕</button>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('sg-unk-report').onclick = () => {
+      banner.remove();
+      showStepUrl('phishing', location.href);
+    };
+    document.getElementById('sg-unk-safe').onclick = () => {
+      banner.remove();
+      showStepDescription('safe', location.href);
+    };
+    document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
+  }
+
+  if (isUnknown) {
+    window.addEventListener('DOMContentLoaded', showUnknownBanner);
+  }
 
   // ---- Warning overlay for flagged sites ----
   if (detectedCategory) {
