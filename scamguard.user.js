@@ -7,8 +7,8 @@
 // @match        *://*/*
 // @run-at       document-start
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/USERNAME/scamguard/main/scamguard.user.js
-// @downloadURL  https://raw.githubusercontent.com/USERNAME/scamguard/main/scamguard.user.js
+// @updateURL    https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js
+// @downloadURL  https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js
 // ==/UserScript==
 
 (function() {
