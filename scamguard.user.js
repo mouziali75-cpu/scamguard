@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      2.1
+// @version      2.2
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -39,14 +39,14 @@
   ];
 
   // ============================================
-  //  WARNING IMAGE
+  //  WARNING IMAGE (leave '' to use emoji fallback)
   // ============================================
   const warningImageUrl = 'https://i.postimg.cc/BZ84GV46/Photoroom-20260721-203154.png';
 
   // ============================================
   //  DISCORD WEBHOOK URL
   // ============================================
-  const webhookUrl = 'https://discord.com/api/webhooks/1529255203595878430/Sfl-UVmfYYbbQZJtwQvR0Tf272gpEAKHJ1Jz4PAXFVUf8aq7UcBXKjVjq2FVURPJUDXv';
+  const webhookUrl = 'PASTE_YOUR_WEBHOOK_URL_HERE';
 
   const suspiciousTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top', '.club'];
   const phishKeywords = [
@@ -113,7 +113,7 @@
     const modal = document.createElement('div');
     modal.style.cssText = `
       position:fixed;top:0;left:0;width:100%;height:100%;
-      background:rgba(0,0,0,0.6);z-index:9999999;
+      background:rgba(0,0,0,0.6);z-index:10000000;
       display:flex;align-items:center;justify-content:center;
       font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
     `;
@@ -205,7 +205,7 @@
     document.getElementById('sg-cancel').onclick = () => modal.remove();
   }
 
-  // ---- Floating button ----
+  // ---- Floating report button (for normal, non-flagged pages) ----
   const fab = document.createElement('div');
   fab.innerHTML = '🚩';
   fab.title = 'Report a site';
@@ -222,7 +222,7 @@
   if (detectedCategory) {
     const style = categoryStyles[detectedCategory];
     const imageHtml = detectedCategory === 'phishing' && warningImageUrl
-      ? `<img src="${warningImageUrl}" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
+      ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
       : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
 
     const overlay = document.createElement('div');
@@ -242,16 +242,21 @@
           ${flags.join('<br>')}
         </p>
       </div>
-      <p style="font-size:13px;color:#a8c8ea;margin:0 0 24px;word-break:break-all;">${host}</p>
+      <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
       <button id="sg-leave" style="padding:13px 32px;margin-bottom:10px;background:${style.accent};
               color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
-      <button id="sg-continue" style="padding:11px 28px;background:transparent;color:#a8c8ea;
+      <button id="sg-continue" style="padding:11px 28px;margin-bottom:10px;background:transparent;color:#a8c8ea;
               border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
         Continue anyway
+      </button>
+      <button id="sg-report-btn" style="padding:9px 20px;background:transparent;color:#a8c8ea;
+              border:none;font-size:13px;text-decoration:underline;">
+        🚩 Report a different issue with this site
       </button>
     `;
     document.documentElement.appendChild(overlay);
     document.getElementById('sg-leave').onclick = () => history.back();
     document.getElementById('sg-continue').onclick = () => overlay.remove();
+    document.getElementById('sg-report-btn').onclick = () => openReportModal();
   }
 })();
