@@ -432,4 +432,291 @@
                background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
                color:white;font-size:13px;resize:vertical;margin-bottom:16px;"></textarea>
       <button id="sg-submit" style="width:100%;padding:12px;background:#4caf50;color:white;
-              border:none;border-radius:8px;font-weight:600;font
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:8px;">
+        ${t('submitBtn')}
+      </button>
+      <button id="sg-back" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;">${t('backBtn')}</button>
+    `, true);
+    document.getElementById('sg-submit').onclick = () => {
+      const note = document.getElementById('sg-note').value;
+      modal.remove();
+      sendReport(url, category, note);
+    };
+    document.getElementById('sg-back').onclick = () => {
+      modal.remove();
+      showStepUrl(category);
+    };
+  }
+
+  function showStepUrl(category, prefill) {
+    const modal = showModal(`
+      <h3 style="color:white;margin:0 0 4px;font-size:17px;">${t('enterLinkTitle')}</h3>
+      <p style="color:#7fa8d9;font-size:13px;margin:0 0 16px;">${t('cat' + category.charAt(0).toUpperCase() + category.slice(1))}</p>
+      <input id="sg-url" type="text" placeholder="${t('urlPlaceholder')}" value="${prefill || ''}"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+               color:white;font-size:13px;margin-bottom:16px;">
+      <button id="sg-next" style="width:100%;padding:12px;background:#2196f3;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:8px;">
+        ${t('nextBtn')}
+      </button>
+      <button id="sg-back" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;">${t('backBtn')}</button>
+    `, true);
+    document.getElementById('sg-next').onclick = () => {
+      const url = document.getElementById('sg-url').value.trim();
+      if (!url) { alert('Please enter a link or domain.'); return; }
+      modal.remove();
+      showStepDescription(category, url);
+    };
+    document.getElementById('sg-back').onclick = () => {
+      modal.remove();
+      openReportModal();
+    };
+  }
+
+  function openReportModal() {
+    const modal = showModal(`
+      <h3 style="color:white;margin:0 0 16px;font-size:17px;">${t('reportTitle')}</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+        <button data-cat="phishing" style="padding:12px;background:#2196f3;color:white;border:none;border-radius:8px;font-size:14px;">${t('catPhishing')}</button>
+        <button data-cat="adult" style="padding:12px;background:#e53935;color:white;border:none;border-radius:8px;font-size:14px;">${t('catAdult')}</button>
+        <button data-cat="unwanted" style="padding:12px;background:#fbc02d;color:#222;border:none;border-radius:8px;font-size:14px;">${t('catUnwanted')}</button>
+        <button data-cat="safe" style="padding:12px;background:#4caf50;color:white;border:none;border-radius:8px;font-size:14px;">${t('catSafe')}</button>
+      </div>
+      <button id="sg-cancel" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;">${t('cancelBtn')}</button>
+    `, true);
+    modal.querySelectorAll('button[data-cat]').forEach(btn => {
+      btn.onclick = () => {
+        const cat = btn.dataset.cat;
+        modal.remove();
+        showStepUrl(cat);
+      };
+    });
+    document.getElementById('sg-cancel').onclick = () => modal.remove();
+  }
+
+  function showUnknownBanner() {
+    const banner = document.createElement('div');
+    banner.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    banner.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;z-index:999997;
+      background:#1a2a3d;color:#cfe4ff;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+      font-size:13px;padding:10px 14px;box-sizing:border-box;
+      display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    `;
+    banner.innerHTML = `
+      <span style="flex:1;line-height:1.4;min-width:150px;">⚠️ ${t('unknownBannerText')}</span>
+      <button id="sg-unk-lang" style="flex-shrink:0;padding:6px 8px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:6px;font-size:11px;">🌐</button>
+      <button id="sg-unk-report" style="flex-shrink:0;padding:6px 10px;background:#e53935;color:white;
+              border:none;border-radius:6px;font-size:12px;">${t('unknownReportBtn')}</button>
+      <button id="sg-unk-safe" style="flex-shrink:0;padding:6px 10px;background:#4caf50;color:white;
+              border:none;border-radius:6px;font-size:12px;">${t('unknownSafeBtn')}</button>
+      <button id="sg-unk-dismiss" style="flex-shrink:0;padding:6px 8px;background:transparent;color:#a8c8ea;
+              border:none;font-size:16px;">✕</button>
+    `;
+    document.documentElement.appendChild(banner);
+    document.getElementById('sg-unk-lang').onclick = () => cycleLang();
+    document.getElementById('sg-unk-report').onclick = () => {
+      banner.remove();
+      showStepUrl('phishing', location.href);
+    };
+    document.getElementById('sg-unk-safe').onclick = () => {
+      banner.remove();
+      showStepDescription('safe', location.href);
+    };
+    document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
+  }
+
+  function ensureFabButton() {
+    if (document.getElementById('sg-fab-btn')) return;
+    const fab = document.createElement('div');
+    fab.id = 'sg-fab-btn';
+    fab.innerHTML = '🚩';
+    fab.title = 'Report a site';
+    fab.style.cssText = `
+      position:fixed;bottom:20px;right:20px;width:48px;height:48px;
+      background:#2196f3;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:22px;cursor:pointer;z-index:999998;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    `;
+    fab.onclick = openReportModal;
+    document.documentElement.appendChild(fab);
+  }
+
+  // ---- Disclaimer screen shown when user taps "Continue anyway" ----
+  function showDisclaimer(category, onConfirm) {
+    const msgKey = disclaimerKeyMap[category] || 'disclaimerPhishing';
+    const imageHtml = disclaimerImageUrl
+      ? `<img src="${disclaimerImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>⚠️</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
+      : `<div style="font-size:48px;margin-bottom:8px;">⚠️</div>`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sg-disclaimer';
+    overlay.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:linear-gradient(160deg, #1a1a1a 0%, #3a1a1a 100%);
+      color:white;z-index:2147483647;
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+      padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+    `;
+    overlay.innerHTML = `
+      <div id="sg-disclaimer-topbar-slot" style="width:100%;max-width:280px;"></div>
+      ${imageHtml}
+      <h1 style="font-size:20px;margin:0 0 12px;">${t('disclaimerTitle')}</h1>
+      <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
+                  border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0 24px;">
+        <p style="margin:0;font-size:15px;line-height:1.6;color:#f0e8e8;">
+          ${t(msgKey)}
+        </p>
+      </div>
+      <button id="sg-disc-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:#e53935;
+              color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">${t('disclaimerLeaveBtn')}</button>
+      <button id="sg-disc-ok" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;color:#f0e8e8;
+              border:1px solid rgba(255,255,255,0.3);border-radius:10px;font-size:14px;">${t('disclaimerOkBtn')}</button>
+    `;
+    document.documentElement.appendChild(overlay);
+    attachTopBar(document.getElementById('sg-disclaimer-topbar-slot'), true);
+
+    document.getElementById('sg-disc-leave').onclick = () => {
+      window.location.href = 'https://www.google.com';
+    };
+    document.getElementById('sg-disc-ok').onclick = () => {
+      overlay.remove();
+      onConfirm();
+    };
+  }
+
+  function renderUI(detectedCategory, flags, isUnknown) {
+    ensureFabButton();
+
+    if (isUnknown) showUnknownBanner();
+
+    if (detectedCategory) {
+      const style = categoryColors[detectedCategory];
+      const flagTexts = flags.map(f => t(f.key, f.params));
+      const imageHtml = warningImageUrl
+        ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
+        : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
+
+      let userDismissed = false;
+
+      function buildOverlay() {
+        if (userDismissed) return;
+        if (document.getElementById('sg-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'sg-overlay';
+        overlay.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        overlay.style.cssText = `
+          position:fixed;top:0;left:0;width:100%;height:100%;
+          background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
+          color:white;z-index:2147483647;
+          display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+          font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+          padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+        `;
+        overlay.innerHTML = `
+          <div id="sg-overlay-topbar-slot" style="width:100%;max-width:280px;"></div>
+          ${imageHtml}
+          <h1 style="font-size:22px;margin:0 0 8px;">${t(titleKeyMap[detectedCategory])}</h1>
+          <div style="background:rgba(255,255,255,0.08);border:1px solid ${style.accent}66;
+                      border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0;">
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#e8f0fb;">
+              ${flagTexts.join('<br>')}
+            </p>
+          </div>
+          <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
+          <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
+                  color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">${t('leaveBtn')}</button>
+          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
+                  border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+            ${t('continueBtn')}
+          </button>
+          <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+                  color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+            ${t('reportBtn')}
+          </button>
+        `;
+        document.documentElement.appendChild(overlay);
+        attachTopBar(document.getElementById('sg-overlay-topbar-slot'), true);
+
+        document.getElementById('sg-leave').onclick = () => { window.location.href = 'https://www.google.com'; };
+        document.getElementById('sg-continue').onclick = () => {
+          showDisclaimer(detectedCategory, () => {
+            userDismissed = true;
+            overlay.remove();
+          });
+        };
+        document.getElementById('sg-report-btn').onclick = () => openReportModal();
+      }
+
+      buildOverlay();
+
+      const watchdog = new MutationObserver(() => {
+        if (!userDismissed && !document.getElementById('sg-overlay')) {
+          buildOverlay();
+        }
+      });
+      watchdog.observe(document.documentElement, { childList: true, subtree: false });
+
+      const watchdogInterval = setInterval(() => {
+        if (userDismissed) { clearInterval(watchdogInterval); return; }
+        if (!document.getElementById('sg-overlay')) buildOverlay();
+      }, 800);
+    }
+  }
+
+  const instantResult = instantCheck();
+  if (instantResult.detectedCategory) {
+    alreadyRendered = true;
+    renderUI(instantResult.detectedCategory, instantResult.flags, false);
+  }
+
+  let adultSetResult = null;
+  let phishSetResult = null;
+
+  function tryRunOnlineCheck() {
+    if (adultSetResult === null || phishSetResult === null) return;
+    if (alreadyRendered) return;
+
+    let detectedCategory = null;
+    let flags = [];
+
+    if (matchesSet(phishSetResult)) {
+      detectedCategory = 'phishing';
+      flags.push({ key: 'flagURLhaus' });
+    }
+    if (!detectedCategory && matchesSet(adultSetResult)) {
+      detectedCategory = 'adult';
+      flags.push({ key: 'flagAdultOnline' });
+    }
+
+    const isUnknown = !detectedCategory && !isTrusted;
+
+    if (detectedCategory) {
+      alreadyRendered = true;
+      renderUI(detectedCategory, flags, false);
+    } else if (isUnknown) {
+      renderUI(null, [], true);
+    } else {
+      ensureFabButton();
+    }
+  }
+
+  loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
+    adultSetResult = set;
+    tryRunOnlineCheck();
+  });
+
+  loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
+    phishSetResult = set;
+    tryRunOnlineCheck();
+  });
+})();
