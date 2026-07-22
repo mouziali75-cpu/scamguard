@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      4.1
+// @version      4.2
 // @description  Multi-category site detector (manual + online lists)
 // @author       You
 // @match        *://*/*
@@ -16,8 +16,7 @@
   const fullUrl = location.href.toLowerCase();
 
   // ============================================
-  //  PHISHING / SCAM DOMAINS — your manual list
-  //  (combined with the online URLhaus list automatically)
+  //  PHISHING / SCAM DOMAINS — manual list
   // ============================================
   const phishingDomains = [
     'roblox.com.bz',
@@ -26,8 +25,7 @@
   ];
 
   // ============================================
-  //  ADULT CONTENT — your manual list
-  //  (combined with the online StevenBlack list automatically)
+  //  ADULT CONTENT — manual list (combined with online list)
   // ============================================
   const manualAdultDomains = [
     // add domains here
@@ -67,8 +65,8 @@
   const ADULT_CACHE_TIME_KEY = 'sg_adult_domains_cache_time';
   const PHISH_CACHE_KEY = 'sg_phishing_domains_cache';
   const PHISH_CACHE_TIME_KEY = 'sg_phishing_domains_cache_time';
-  const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 3; // 3 days
-  const FETCH_TIMEOUT = 4000; // 4 seconds max wait
+  const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 3;
+  const FETCH_TIMEOUT = 4000;
 
   // ============================================
   //  WARNING IMAGE
@@ -120,7 +118,7 @@
         callback(new Set(cachedList));
         return;
       }
-    } catch (e) { /* ignore corrupt cache */ }
+    } catch (e) {}
 
     let done = false;
     const timeoutId = setTimeout(() => {
@@ -140,7 +138,7 @@
         try {
           localStorage.setItem(cacheKey, JSON.stringify(domains));
           localStorage.setItem(cacheTimeKey, Date.now().toString());
-        } catch (e) { /* storage blocked/full, ignore */ }
+        } catch (e) {}
         callback(new Set(domains));
       })
       .catch(() => {
@@ -151,42 +149,14 @@
       });
   }
 
-  // ---- Load both online lists in parallel, then run detection ----
-  let adultSetResult = null;
-  let phishSetResult = null;
-
-  function tryRunDetection() {
-    if (adultSetResult === null || phishSetResult === null) return; // wait for both
-    runDetection(adultSetResult, phishSetResult);
-  }
-
-  loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
-    adultSetResult = set;
-    tryRunDetection();
-  });
-
-  loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
-    phishSetResult = set;
-    tryRunDetection();
-  });
-
   // ============================================
-  //  MAIN DETECTION — runs once both lists are ready (or timed out)
+  //  PHASE 1: INSTANT CHECK — runs synchronously, no network wait
   // ============================================
-  function runDetection(adultDomainsSet, onlinePhishingSet) {
+  function instantCheck() {
     let detectedCategory = null;
     let flags = [];
 
-    // --- Phishing: manual list ---
     if (matches(phishingDomains)) { detectedCategory = 'phishing'; flags.push('This domain is on the known phishing list'); }
-
-    // --- Phishing: online URLhaus list ---
-    if (!detectedCategory && matchesSet(onlinePhishingSet)) {
-      detectedCategory = 'phishing';
-      flags.push('This domain is on the URLhaus threat list');
-    }
-
-    // --- Phishing: heuristics (punycode, TLD, keywords, brand impersonation) ---
     if (host.includes('xn--')) { detectedCategory = detectedCategory || 'phishing'; flags.push('Punycode domain (may impersonate a real site)'); }
     if (suspiciousTLDs.some(tld => host.endsWith(tld))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Domain extension commonly used for scams'); }
     if (phishKeywords.some(k => fullUrl.includes(k))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Suspicious keywords in URL'); }
@@ -196,24 +166,20 @@
         flags.push(`Contains "${brand}" but isn't the official domain`);
       }
     });
-
-    // --- Adult content: manual list OR online list ---
-    if (!detectedCategory && (matches(manualAdultDomains) || matchesSet(adultDomainsSet))) {
+    if (!detectedCategory && matches(manualAdultDomains)) {
       detectedCategory = 'adult';
       flags.push('This domain is flagged as adult content');
     }
-
-    // --- Unwanted: manual list only ---
     if (!detectedCategory && matches(unwantedDomains)) {
       detectedCategory = 'unwanted';
       flags.push('This site is flagged as unwanted/low-quality content');
     }
 
-    const isTrusted = matches(trustedDomains);
-    const isUnknown = !detectedCategory && !isTrusted;
-
-    renderUI(detectedCategory, flags, isUnknown);
+    return { detectedCategory, flags };
   }
+
+  const isTrusted = matches(trustedDomains);
+  let alreadyRendered = false;
 
   // ---- Webhook sender ----
   function sendReport(url, category, note) {
@@ -256,7 +222,7 @@
         ${innerHtml}
       </div>
     `;
-    document.body.appendChild(modal);
+    document.documentElement.appendChild(modal);
     return modal;
   }
 
@@ -353,7 +319,7 @@
       <button id="sg-unk-dismiss" style="flex-shrink:0;padding:6px 8px;background:transparent;color:#a8c8ea;
               border:none;font-size:16px;">✕</button>
     `;
-    document.body.appendChild(banner);
+    document.documentElement.appendChild(banner);
     document.getElementById('sg-unk-report').onclick = () => {
       banner.remove();
       showStepUrl('phishing', location.href);
@@ -365,8 +331,10 @@
     document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
   }
 
-  function renderUI(detectedCategory, flags, isUnknown) {
+  function ensureFabButton() {
+    if (document.getElementById('sg-fab-btn')) return;
     const fab = document.createElement('div');
+    fab.id = 'sg-fab-btn';
     fab.innerHTML = '🚩';
     fab.title = 'Report a site';
     fab.style.cssText = `
@@ -376,7 +344,11 @@
       box-shadow:0 4px 12px rgba(0,0,0,0.3);
     `;
     fab.onclick = openReportModal;
-    document.body.appendChild(fab);
+    document.documentElement.appendChild(fab);
+  }
+
+  function renderUI(detectedCategory, flags, isUnknown) {
+    ensureFabButton();
 
     if (isUnknown) showUnknownBanner();
 
@@ -422,4 +394,53 @@
       document.getElementById('sg-report-btn').onclick = () => openReportModal();
     }
   }
+
+  // ---- Run Phase 1 immediately (synchronous, no network needed) ----
+  const instantResult = instantCheck();
+  if (instantResult.detectedCategory) {
+    alreadyRendered = true;
+    renderUI(instantResult.detectedCategory, instantResult.flags, false);
+  }
+
+  // ---- Phase 2: online lists (additive, runs after Phase 1) ----
+  let adultSetResult = null;
+  let phishSetResult = null;
+
+  function tryRunOnlineCheck() {
+    if (adultSetResult === null || phishSetResult === null) return;
+    if (alreadyRendered) return;
+
+    let detectedCategory = null;
+    let flags = [];
+
+    if (matchesSet(phishSetResult)) {
+      detectedCategory = 'phishing';
+      flags.push('This domain is on the URLhaus threat list');
+    }
+    if (!detectedCategory && matchesSet(adultSetResult)) {
+      detectedCategory = 'adult';
+      flags.push('This domain is flagged as adult content (online list)');
+    }
+
+    const isUnknown = !detectedCategory && !isTrusted;
+
+    if (detectedCategory) {
+      alreadyRendered = true;
+      renderUI(detectedCategory, flags, false);
+    } else if (isUnknown) {
+      renderUI(null, [], true);
+    } else {
+      ensureFabButton();
+    }
+  }
+
+  loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
+    adultSetResult = set;
+    tryRunOnlineCheck();
+  });
+
+  loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
+    phishSetResult = set;
+    tryRunOnlineCheck();
+  });
 })();
