@@ -42,18 +42,55 @@
   //  TRUSTED / WELL-KNOWN DOMAINS
   // ============================================
   const trustedDomains = [
-    'google.com', 'youtube.com', 'gmail.com', 'facebook.com', 'instagram.com',
-    'whatsapp.com', 'twitter.com', 'x.com', 'reddit.com', 'wikipedia.org',
-    'roblox.com', 'discord.com', 'discordapp.com', 'steampowered.com',
-    'steamcommunity.com', 'epicgames.com', 'minecraft.net', 'ea.com',
-    'ubisoft.com', 'twitch.tv', 'tiktok.com', 'spotify.com', 'netflix.com',
-    'amazon.com', 'microsoft.com', 'apple.com', 'icloud.com', 'github.com',
-    'githubusercontent.com', 'stackoverflow.com', 'paypal.com', 'telegram.org',
-    'telegram.me', 't.me', 'linkedin.com', 'pinterest.com', 'snapchat.com',
-    'yahoo.com', 'bing.com', 'duckduckgo.com', 'cloudflare.com', 'imgur.com',
-    'postimg.cc', 'catbox.moe', 'bot-hosting.net', 'viayoo.com', 'mongodb.com',
-    'expo.dev', 'render.com', 'vercel.com', 'netlify.com',
-  ];
+  // Search & Tech Giants
+  'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'microsoft.com',
+  'apple.com', 'icloud.com', 'amazon.com', 'cloudflare.com',
+
+  // Social Media
+  'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+  'snapchat.com', 'pinterest.com', 'linkedin.com', 'reddit.com', 'tumblr.com',
+  'threads.net',
+
+  // Messaging
+  'whatsapp.com', 'telegram.org', 'telegram.me', 't.me', 'discord.com',
+  'discordapp.com', 'signal.org', 'messenger.com',
+
+  // Video / Streaming
+  'youtube.com', 'twitch.tv', 'netflix.com', 'spotify.com', 'soundcloud.com',
+  'vimeo.com', 'dailymotion.com', 'primevideo.com', 'disneyplus.com',
+  'hulu.com',
+
+  // Gaming
+  'roblox.com', 'steampowered.com', 'steamcommunity.com', 'epicgames.com',
+  'minecraft.net', 'ea.com', 'ubisoft.com', 'blizzard.com', 'battle.net',
+  'riotgames.com', 'nintendo.com', 'playstation.com', 'xbox.com',
+  'itch.io', 'gog.com',
+
+  // Dev / Cloud / Hosting
+  'github.com', 'githubusercontent.com', 'gitlab.com', 'stackoverflow.com',
+  'npmjs.com', 'vercel.com', 'netlify.com', 'render.com', 'heroku.com',
+  'mongodb.com', 'firebase.google.com', 'expo.dev', 'bot-hosting.net',
+  'viayoo.com', 'digitalocean.com', 'aws.amazon.com',
+
+  // Payments / Finance
+  'paypal.com', 'stripe.com', 'wise.com', 'visa.com', 'mastercard.com',
+
+  // Shopping
+  'ebay.com', 'aliexpress.com', 'walmart.com', 'etsy.com', 'shopify.com',
+
+  // Reference / Knowledge
+  'wikipedia.org', 'wikimedia.org', 'quora.com', 'medium.com',
+
+  // Image / File Hosting
+  'imgur.com', 'postimg.cc', 'catbox.moe', 'ibb.co', 'dropbox.com',
+  'drive.google.com', 'mega.nz', 'mediafire.com',
+
+  // Email Providers
+  'gmail.com', 'outlook.com', 'protonmail.com', 'yandex.com',
+
+  // News (widely trusted global sources)
+  'bbc.com', 'cnn.com', 'nytimes.com', 'reuters.com', 'apnews.com',
+];
 
   // ============================================
   //  ONLINE LISTS (auto-fetched + cached)
