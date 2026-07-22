@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      3.0
+// @version      3.1
 // @description  Multi-category site detector with reporting flow
 // @author       You
 // @match        *://*/*
@@ -16,7 +16,7 @@
   const fullUrl = location.href.toLowerCase();
 
   // ============================================
-  //  PHISHING / SCAM DOMAINS
+  //  PHISHING / SCAM DOMAINS (manual list)
   // ============================================
   const phishingDomains = [
     'roblox.com.bz',
@@ -25,14 +25,7 @@
   ];
 
   // ============================================
-  //  ADULT CONTENT DOMAINS
-  // ============================================
-  const adultDomains = [
-    // add domains here
-  ];
-
-  // ============================================
-  //  UNWANTED / LOW-QUALITY CONTENT DOMAINS
+  //  UNWANTED / LOW-QUALITY CONTENT DOMAINS (manual list)
   // ============================================
   const unwantedDomains = [
     // add domains here
@@ -40,7 +33,6 @@
 
   // ============================================
   //  TRUSTED / WELL-KNOWN DOMAINS
-  //  (Sites here will NEVER show the "unknown site" notice)
   // ============================================
   const trustedDomains = [
     'google.com', 'youtube.com', 'gmail.com', 'facebook.com', 'instagram.com',
@@ -57,7 +49,16 @@
   ];
 
   // ============================================
-  //  WARNING IMAGE (used for ALL categories, leave '' for emoji fallback)
+  //  ADULT CONTENT — auto-loaded from StevenBlack list
+  // ============================================
+  const adultListUrl = 'https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts';
+  const CACHE_KEY = 'sg_adult_domains_cache';
+  const CACHE_TIME_KEY = 'sg_adult_domains_cache_time';
+  const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 3; // 3 days
+  const FETCH_TIMEOUT = 4000; // don't block the page for more than 4s
+
+  // ============================================
+  //  WARNING IMAGE
   // ============================================
   const warningImageUrl = 'https://i.postimg.cc/BZ84GV46/Photoroom-20260721-203154.png';
 
@@ -85,24 +86,94 @@
     safe:      { label: 'Report as Safe / Well-known',  color: '#1b3a1b', accent: '#4caf50', icon: '✅' }
   };
 
-  let detectedCategory = null;
-  let flags = [];
+  // ---- Load adult domains list (cached, with timeout fallback) ----
+  function loadAdultDomains(callback) {
+    let cachedList = [];
+    try {
+      const cachedTime = parseInt(localStorage.getItem(CACHE_TIME_KEY) || '0');
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) cachedList = JSON.parse(cached);
 
-  if (matches(phishingDomains)) { detectedCategory = 'phishing'; flags.push('This domain is on the known phishing list'); }
-  if (host.includes('xn--')) { detectedCategory = detectedCategory || 'phishing'; flags.push('Punycode domain (may impersonate a real site)'); }
-  if (suspiciousTLDs.some(tld => host.endsWith(tld))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Domain extension commonly used for scams'); }
-  if (phishKeywords.some(k => fullUrl.includes(k))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Suspicious keywords in URL'); }
-  knownBrands.forEach(brand => {
-    if (host.includes(brand) && !host.endsWith(brand + '.com') && !host.endsWith(brand + '.gg')) {
-      detectedCategory = detectedCategory || 'phishing';
-      flags.push(`Contains "${brand}" but isn't the official domain`);
+      if (cached && (Date.now() - cachedTime) < CACHE_MAX_AGE) {
+        callback(new Set(cachedList));
+        return;
+      }
+    } catch (e) {
+      // localStorage unavailable or corrupted cache — continue to fetch
     }
-  });
-  if (!detectedCategory && matches(adultDomains)) { detectedCategory = 'adult'; flags.push('This site is flagged as adult content'); }
-  if (!detectedCategory && matches(unwantedDomains)) { detectedCategory = 'unwanted'; flags.push('This site is flagged as unwanted/low-quality content'); }
 
-  const isTrusted = matches(trustedDomains);
-  const isUnknown = !detectedCategory && !isTrusted;
+    let done = false;
+    const timeoutId = setTimeout(() => {
+      if (!done) { done = true; callback(new Set(cachedList)); }
+    }, FETCH_TIMEOUT);
+
+    fetch(adultListUrl)
+      .then(r => r.text())
+      .then(text => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        const domains = text.split('\n')
+          .filter(line => line.startsWith('0.0.0.0 '))
+          .map(line => line.replace('0.0.0.0 ', '').trim())
+          .filter(Boolean);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(domains));
+          localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+        } catch (e) { /* storage full or blocked, ignore */ }
+        callback(new Set(domains));
+      })
+      .catch(() => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        callback(new Set(cachedList));
+      });
+  }
+
+  function matchesSet(set) {
+    if (!set || set.size === 0) return false;
+    if (set.has(host)) return true;
+    // Check parent domains too (e.g. sub.example.com -> example.com)
+    const parts = host.split('.');
+    for (let i = 1; i < parts.length - 1; i++) {
+      if (set.has(parts.slice(i).join('.'))) return true;
+    }
+    return false;
+  }
+
+  // ============================================
+  //  MAIN LOGIC — runs once adult list is ready (or times out)
+  // ============================================
+  loadAdultDomains(function(adultDomainsSet) {
+    let detectedCategory = null;
+    let flags = [];
+
+    if (matches(phishingDomains)) { detectedCategory = 'phishing'; flags.push('This domain is on the known phishing list'); }
+    if (host.includes('xn--')) { detectedCategory = detectedCategory || 'phishing'; flags.push('Punycode domain (may impersonate a real site)'); }
+    if (suspiciousTLDs.some(tld => host.endsWith(tld))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Domain extension commonly used for scams'); }
+    if (phishKeywords.some(k => fullUrl.includes(k))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Suspicious keywords in URL'); }
+    knownBrands.forEach(brand => {
+      if (host.includes(brand) && !host.endsWith(brand + '.com') && !host.endsWith(brand + '.gg')) {
+        detectedCategory = detectedCategory || 'phishing';
+        flags.push(`Contains "${brand}" but isn't the official domain`);
+      }
+    });
+
+    if (!detectedCategory && matchesSet(adultDomainsSet)) {
+      detectedCategory = 'adult';
+      flags.push('This domain is on the adult content list (StevenBlack/hosts)');
+    }
+    if (!detectedCategory && matches(unwantedDomains)) {
+      detectedCategory = 'unwanted';
+      flags.push('This site is flagged as unwanted/low-quality content');
+    }
+
+    const isTrusted = matches(trustedDomains);
+    const isUnknown = !detectedCategory && !isTrusted;
+
+    renderUI(detectedCategory, flags, isUnknown);
+  });
 
   // ---- Webhook sender ----
   function sendReport(url, category, note) {
@@ -130,7 +201,6 @@
       .catch(() => alert('Failed to send report.'));
   }
 
-  // ---- Modal shell helper ----
   function showModal(innerHtml) {
     const modal = document.createElement('div');
     modal.style.cssText = `
@@ -150,12 +220,11 @@
     return modal;
   }
 
-  // ---- Step 3: Description ----
   function showStepDescription(category, url) {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 4px;font-size:17px;">Describe the issue</h3>
       <p style="color:#7fa8d9;font-size:13px;margin:0 0 16px;">${categoryStyles[category].label}</p>
-      <textarea id="sg-note" placeholder="e.g. Fake login page asking for password, or a gambling site sent by a scammer..."
+      <textarea id="sg-note" placeholder="e.g. Fake login page asking for password..."
         style="width:100%;box-sizing:border-box;min-height:90px;padding:10px;border-radius:8px;
                background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
                color:white;font-size:13px;resize:vertical;margin-bottom:16px;"></textarea>
@@ -177,7 +246,6 @@
     };
   }
 
-  // ---- Step 2: URL / domain (always starts EMPTY) ----
   function showStepUrl(category, prefill) {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 4px;font-size:17px;">Enter the link or domain</h3>
@@ -205,7 +273,6 @@
     };
   }
 
-  // ---- Step 1: Category ----
   function openReportModal() {
     const modal = showModal(`
       <h3 style="color:white;margin:0 0 16px;font-size:17px;">What are you reporting?</h3>
@@ -228,20 +295,6 @@
     document.getElementById('sg-cancel').onclick = () => modal.remove();
   }
 
-  // ---- Floating report button (for normal, non-flagged pages) ----
-  const fab = document.createElement('div');
-  fab.innerHTML = '🚩';
-  fab.title = 'Report a site';
-  fab.style.cssText = `
-    position:fixed;bottom:20px;right:20px;width:48px;height:48px;
-    background:#2196f3;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;font-size:22px;cursor:pointer;z-index:999998;
-    box-shadow:0 4px 12px rgba(0,0,0,0.3);
-  `;
-  fab.onclick = openReportModal;
-  window.addEventListener('DOMContentLoaded', () => document.body.appendChild(fab));
-
-  // ---- Lightweight "unknown site" banner (non-blocking) ----
   function showUnknownBanner() {
     const banner = document.createElement('div');
     banner.style.cssText = `
@@ -272,52 +325,61 @@
     document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
   }
 
-  if (isUnknown) {
-    window.addEventListener('DOMContentLoaded', showUnknownBanner);
-  }
-
-  // ---- Warning overlay for flagged sites ----
-  if (detectedCategory) {
-    const style = categoryStyles[detectedCategory];
-    const imageHtml = warningImageUrl
-      ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
-      : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position:fixed;top:0;left:0;width:100%;height:100%;
-      background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
-      color:white;z-index:999999;
-      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
-      padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+  function renderUI(detectedCategory, flags, isUnknown) {
+    const fab = document.createElement('div');
+    fab.innerHTML = '🚩';
+    fab.title = 'Report a site';
+    fab.style.cssText = `
+      position:fixed;bottom:20px;right:20px;width:48px;height:48px;
+      background:#2196f3;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:22px;cursor:pointer;z-index:999998;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);
     `;
-    overlay.innerHTML = `
-      ${imageHtml}
-      <h1 style="font-size:22px;margin:0 0 8px;">${style.label} Detected</h1>
-      <div style="background:rgba(255,255,255,0.08);border:1px solid ${style.accent}66;
-                  border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0;">
-        <p style="margin:0;font-size:15px;line-height:1.6;color:#e8f0fb;">
-          ${flags.join('<br>')}
-        </p>
-      </div>
-      <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
-      <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
-              color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
-      <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
-              border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
-        Continue anyway
-      </button>
-      <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
-              color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
-        🚩 Report a different issue
-      </button>
-    `;
-    document.documentElement.appendChild(overlay);
-    document.getElementById('sg-leave').onclick = () => {
-      window.location.href = 'https://www.google.com';
-    };
-    document.getElementById('sg-continue').onclick = () => overlay.remove();
-    document.getElementById('sg-report-btn').onclick = () => openReportModal();
+    fab.onclick = openReportModal;
+    document.body.appendChild(fab);
+
+    if (isUnknown) showUnknownBanner();
+
+    if (detectedCategory) {
+      const style = categoryStyles[detectedCategory];
+      const imageHtml = warningImageUrl
+        ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
+        : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
+
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
+        color:white;z-index:999999;
+        display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+        font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+        padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+      `;
+      overlay.innerHTML = `
+        ${imageHtml}
+        <h1 style="font-size:22px;margin:0 0 8px;">${style.label} Detected</h1>
+        <div style="background:rgba(255,255,255,0.08);border:1px solid ${style.accent}66;
+                    border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0;">
+          <p style="margin:0;font-size:15px;line-height:1.6;color:#e8f0fb;">
+            ${flags.join('<br>')}
+          </p>
+        </div>
+        <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
+        <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
+                color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
+        <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
+                border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+          Continue anyway
+        </button>
+        <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+                color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+          🚩 Report a different issue
+        </button>
+      `;
+      document.documentElement.appendChild(overlay);
+      document.getElementById('sg-leave').onclick = () => { window.location.href = 'https://www.google.com'; };
+      document.getElementById('sg-continue').onclick = () => overlay.remove();
+      document.getElementById('sg-report-btn').onclick = () => openReportModal();
+    }
   }
 })();
