@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      4.2
+// @version      4.3
 // @description  Multi-category site detector (manual + online lists)
 // @author       You
 // @match        *://*/*
@@ -28,11 +28,11 @@
   //  ADULT CONTENT — manual list (combined with online list)
   // ============================================
   const manualAdultDomains = [
-  'pornhub.com',
-  'xhamster.com',
-  'stripchat.com',
-  'xvideos.com',
-];
+    'pornhub.com',
+    'xhamster.com',
+    'stripchat.com',
+    'xvideos.com',
+  ];
 
   // ============================================
   //  UNWANTED / LOW-QUALITY CONTENT — manual only
@@ -45,72 +45,72 @@
   //  TRUSTED / WELL-KNOWN DOMAINS
   // ============================================
   const trustedDomains = [
-  // Search & Tech Giants
-  'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'microsoft.com',
-  'apple.com', 'icloud.com', 'amazon.com', 'cloudflare.com', 'samsung.com',
-  'brave.com',
+    // Search & Tech Giants
+    'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'microsoft.com',
+    'apple.com', 'icloud.com', 'amazon.com', 'cloudflare.com', 'samsung.com',
+    'brave.com',
 
-  // AI Assistants
-  'chatgpt.com', 'claude.ai', 'gemini.google.com',
+    // AI Assistants
+    'chatgpt.com', 'claude.ai', 'gemini.google.com',
 
-  // Social Media
-  'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
-  'snapchat.com', 'pinterest.com', 'linkedin.com', 'reddit.com', 'tumblr.com',
-  'threads.net', 'vk.com',
+    // Social Media
+    'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+    'snapchat.com', 'pinterest.com', 'linkedin.com', 'reddit.com', 'tumblr.com',
+    'threads.net', 'vk.com',
 
-  // Messaging
-  'whatsapp.com', 'telegram.org', 'telegram.me', 't.me', 'discord.com',
-  'discordapp.com', 'signal.org', 'messenger.com',
+    // Messaging
+    'whatsapp.com', 'telegram.org', 'telegram.me', 't.me', 'discord.com',
+    'discordapp.com', 'signal.org', 'messenger.com',
 
-  // Video / Streaming
-  'youtube.com', 'twitch.tv', 'netflix.com', 'spotify.com', 'soundcloud.com',
-  'vimeo.com', 'dailymotion.com', 'primevideo.com', 'disneyplus.com',
-  'hulu.com', 'bilibili.com',
+    // Video / Streaming
+    'youtube.com', 'twitch.tv', 'netflix.com', 'spotify.com', 'soundcloud.com',
+    'vimeo.com', 'dailymotion.com', 'primevideo.com', 'disneyplus.com',
+    'hulu.com', 'bilibili.com',
 
-  // Gaming
-  'roblox.com', 'steampowered.com', 'steamcommunity.com', 'epicgames.com',
-  'minecraft.net', 'ea.com', 'ubisoft.com', 'blizzard.com', 'battle.net',
-  'riotgames.com', 'nintendo.com', 'playstation.com', 'xbox.com',
-  'itch.io', 'gog.com',
+    // Gaming
+    'roblox.com', 'steampowered.com', 'steamcommunity.com', 'epicgames.com',
+    'minecraft.net', 'ea.com', 'ubisoft.com', 'blizzard.com', 'battle.net',
+    'riotgames.com', 'nintendo.com', 'playstation.com', 'xbox.com',
+    'itch.io', 'gog.com',
 
-  // Dev / Cloud / Hosting
-  'github.com', 'githubusercontent.com', 'gitlab.com', 'stackoverflow.com',
-  'npmjs.com', 'vercel.com', 'netlify.com', 'render.com', 'heroku.com',
-  'mongodb.com', 'firebase.google.com', 'expo.dev', 'bot-hosting.net',
-  'viayoo.com', 'digitalocean.com', 'aws.amazon.com',
+    // Dev / Cloud / Hosting
+    'github.com', 'githubusercontent.com', 'gitlab.com', 'stackoverflow.com',
+    'npmjs.com', 'vercel.com', 'netlify.com', 'render.com', 'heroku.com',
+    'mongodb.com', 'firebase.google.com', 'expo.dev', 'bot-hosting.net',
+    'viayoo.com', 'digitalocean.com', 'aws.amazon.com',
 
-  // Payments / Finance
-  'paypal.com', 'stripe.com', 'wise.com', 'visa.com', 'mastercard.com',
-  'bet.br',
+    // Payments / Finance
+    'paypal.com', 'stripe.com', 'wise.com', 'visa.com', 'mastercard.com',
+    'bet.br',
 
-  // Shopping
-  'ebay.com', 'aliexpress.com', 'walmart.com', 'etsy.com', 'shopify.com',
-  'temu.com', 'booking.com',
+    // Shopping
+    'ebay.com', 'aliexpress.com', 'walmart.com', 'etsy.com', 'shopify.com',
+    'temu.com', 'booking.com',
 
-  // Reference / Knowledge
-  'wikipedia.org', 'wikimedia.org', 'quora.com', 'medium.com', 'fandom.com',
+    // Reference / Knowledge
+    'wikipedia.org', 'wikimedia.org', 'quora.com', 'medium.com', 'fandom.com',
 
-  // Image / File Hosting
-  'imgur.com', 'postimg.cc', 'catbox.moe', 'ibb.co', 'dropbox.com',
-  'drive.google.com', 'mega.nz', 'mediafire.com',
+    // Image / File Hosting
+    'imgur.com', 'postimg.cc', 'catbox.moe', 'ibb.co', 'dropbox.com',
+    'drive.google.com', 'mega.nz', 'mediafire.com',
 
-  // Email Providers
-  'gmail.com', 'outlook.com', 'live.com', 'protonmail.com', 'yandex.com',
-  'yandex.ru', 'mail.ru',
+    // Email Providers
+    'gmail.com', 'outlook.com', 'live.com', 'protonmail.com', 'yandex.com',
+    'yandex.ru', 'mail.ru',
 
-  // Microsoft Ecosystem
-  'cloud.microsoft',
+    // Microsoft Ecosystem
+    'cloud.microsoft',
 
-  // Regional Search / Portals
-  'baidu.com', 'naver.com', 'dzen.ru', 'yahoo.co.jp',
+    // Regional Search / Portals
+    'baidu.com', 'naver.com', 'dzen.ru', 'yahoo.co.jp',
 
-  // News / Weather
-  'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
-  'apnews.com', 'globo.com', 'weather.com',
+    // News / Weather
+    'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
+    'apnews.com', 'globo.com', 'weather.com',
 
-  // Design Tools
-  'canva.com',
-];
+    // Design Tools
+    'canva.com',
+  ];
 
   // ============================================
   //  ONLINE LISTS (auto-fetched + cached)
@@ -164,7 +164,6 @@
     safe:      { label: 'Report as Safe / Well-known',  color: '#1b3a1b', accent: '#4caf50', icon: '✅' }
   };
 
-  // ---- Generic loader for a hosts-file style list, with cache + timeout ----
   function loadHostsList(url, cacheKey, cacheTimeKey, callback) {
     let cachedList = [];
     try {
@@ -206,9 +205,6 @@
       });
   }
 
-  // ============================================
-  //  PHASE 1: INSTANT CHECK — runs synchronously, no network wait
-  // ============================================
   function instantCheck() {
     let detectedCategory = null;
     let flags = [];
@@ -238,7 +234,6 @@
   const isTrusted = matches(trustedDomains);
   let alreadyRendered = false;
 
-  // ---- Webhook sender ----
   function sendReport(url, category, note) {
     if (!webhookUrl || webhookUrl.includes('PASTE_YOUR')) {
       alert('Webhook not configured yet.');
@@ -268,7 +263,7 @@
     const modal = document.createElement('div');
     modal.style.cssText = `
       position:fixed;top:0;left:0;width:100%;height:100%;
-      background:rgba(0,0,0,0.6);z-index:10000000;
+      background:rgba(0,0,0,0.6);z-index:2147483647;
       display:flex;align-items:center;justify-content:center;
       font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
       overflow-y:auto;box-sizing:border-box;padding:20px 0;
@@ -415,51 +410,74 @@
         ? `<img src="${warningImageUrl}" onerror="this.outerHTML='<div style=\\'font-size:48px;margin-bottom:8px;\\'>${style.icon}</div>'" style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;border-radius:12px;">`
         : `<div style="font-size:48px;margin-bottom:8px;">${style.icon}</div>`;
 
-      const overlay = document.createElement('div');
-      overlay.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
-        color:white;z-index:999999;
-        display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-        font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
-        padding:40px 24px;overflow-y:auto;box-sizing:border-box;
-      `;
-      overlay.innerHTML = `
-        ${imageHtml}
-        <h1 style="font-size:22px;margin:0 0 8px;">${style.label} Detected</h1>
-        <div style="background:rgba(255,255,255,0.08);border:1px solid ${style.accent}66;
-                    border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0;">
-          <p style="margin:0;font-size:15px;line-height:1.6;color:#e8f0fb;">
-            ${flags.join('<br>')}
-          </p>
-        </div>
-        <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
-        <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
-                color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
-        <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
-                border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
-          Continue anyway
-        </button>
-        <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
-                color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
-          🚩 Report a different issue
-        </button>
-      `;
-      document.documentElement.appendChild(overlay);
-      document.getElementById('sg-leave').onclick = () => { window.location.href = 'https://www.google.com'; };
-      document.getElementById('sg-continue').onclick = () => overlay.remove();
-      document.getElementById('sg-report-btn').onclick = () => openReportModal();
+      let userDismissed = false;
+
+      function buildOverlay() {
+        if (userDismissed) return;
+        if (document.getElementById('sg-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'sg-overlay';
+        overlay.style.cssText = `
+          position:fixed;top:0;left:0;width:100%;height:100%;
+          background:linear-gradient(160deg, #0f1420 0%, ${style.color} 100%);
+          color:white;z-index:2147483647;
+          display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+          font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+          padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+        `;
+        overlay.innerHTML = `
+          ${imageHtml}
+          <h1 style="font-size:22px;margin:0 0 8px;">${style.label} Detected</h1>
+          <div style="background:rgba(255,255,255,0.08);border:1px solid ${style.accent}66;
+                      border-radius:12px;padding:16px 20px;max-width:340px;margin:12px 0;">
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#e8f0fb;">
+              ${flags.join('<br>')}
+            </p>
+          </div>
+          <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
+          <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
+                  color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">Leave this page</button>
+          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
+                  border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+            Continue anyway
+          </button>
+          <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+                  color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+            🚩 Report a different issue
+          </button>
+        `;
+        document.documentElement.appendChild(overlay);
+        document.getElementById('sg-leave').onclick = () => { window.location.href = 'https://www.google.com'; };
+        document.getElementById('sg-continue').onclick = () => {
+          userDismissed = true;
+          overlay.remove();
+        };
+        document.getElementById('sg-report-btn').onclick = () => openReportModal();
+      }
+
+      buildOverlay();
+
+      const watchdog = new MutationObserver(() => {
+        if (!userDismissed && !document.getElementById('sg-overlay')) {
+          buildOverlay();
+        }
+      });
+      watchdog.observe(document.documentElement, { childList: true, subtree: false });
+
+      const watchdogInterval = setInterval(() => {
+        if (userDismissed) { clearInterval(watchdogInterval); return; }
+        if (!document.getElementById('sg-overlay')) buildOverlay();
+      }, 800);
     }
   }
 
-  // ---- Run Phase 1 immediately (synchronous, no network needed) ----
   const instantResult = instantCheck();
   if (instantResult.detectedCategory) {
     alreadyRendered = true;
     renderUI(instantResult.detectedCategory, instantResult.flags, false);
   }
 
-  // ---- Phase 2: online lists (additive, runs after Phase 1) ----
   let adultSetResult = null;
   let phishSetResult = null;
 
