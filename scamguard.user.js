@@ -28,8 +28,11 @@
   //  ADULT CONTENT — manual list (combined with online list)
   // ============================================
   const manualAdultDomains = [
-    // add domains here
-  ];
+  'pornhub.com',
+  'xhamster.com',
+  'stripchat.com',
+  'xvideos.com',
+];
 
   // ============================================
   //  UNWANTED / LOW-QUALITY CONTENT — manual only
@@ -44,12 +47,16 @@
   const trustedDomains = [
   // Search & Tech Giants
   'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'microsoft.com',
-  'apple.com', 'icloud.com', 'amazon.com', 'cloudflare.com',
+  'apple.com', 'icloud.com', 'amazon.com', 'cloudflare.com', 'samsung.com',
+  'brave.com',
+
+  // AI Assistants
+  'chatgpt.com', 'claude.ai', 'gemini.google.com',
 
   // Social Media
   'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
   'snapchat.com', 'pinterest.com', 'linkedin.com', 'reddit.com', 'tumblr.com',
-  'threads.net',
+  'threads.net', 'vk.com',
 
   // Messaging
   'whatsapp.com', 'telegram.org', 'telegram.me', 't.me', 'discord.com',
@@ -58,7 +65,7 @@
   // Video / Streaming
   'youtube.com', 'twitch.tv', 'netflix.com', 'spotify.com', 'soundcloud.com',
   'vimeo.com', 'dailymotion.com', 'primevideo.com', 'disneyplus.com',
-  'hulu.com',
+  'hulu.com', 'bilibili.com',
 
   // Gaming
   'roblox.com', 'steampowered.com', 'steamcommunity.com', 'epicgames.com',
@@ -74,22 +81,35 @@
 
   // Payments / Finance
   'paypal.com', 'stripe.com', 'wise.com', 'visa.com', 'mastercard.com',
+  'bet.br',
 
   // Shopping
   'ebay.com', 'aliexpress.com', 'walmart.com', 'etsy.com', 'shopify.com',
+  'temu.com', 'booking.com',
 
   // Reference / Knowledge
-  'wikipedia.org', 'wikimedia.org', 'quora.com', 'medium.com',
+  'wikipedia.org', 'wikimedia.org', 'quora.com', 'medium.com', 'fandom.com',
 
   // Image / File Hosting
   'imgur.com', 'postimg.cc', 'catbox.moe', 'ibb.co', 'dropbox.com',
   'drive.google.com', 'mega.nz', 'mediafire.com',
 
   // Email Providers
-  'gmail.com', 'outlook.com', 'protonmail.com', 'yandex.com',
+  'gmail.com', 'outlook.com', 'live.com', 'protonmail.com', 'yandex.com',
+  'yandex.ru', 'mail.ru',
 
-  // News (widely trusted global sources)
-  'bbc.com', 'cnn.com', 'nytimes.com', 'reuters.com', 'apnews.com',
+  // Microsoft Ecosystem
+  'cloud.microsoft',
+
+  // Regional Search / Portals
+  'baidu.com', 'naver.com', 'dzen.ru', 'yahoo.co.jp',
+
+  // News / Weather
+  'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
+  'apnews.com', 'globo.com', 'weather.com',
+
+  // Design Tools
+  'canva.com',
 ];
 
   // ============================================
