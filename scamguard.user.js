@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      3.1
-// @description  Multi-category site detector with reporting flow
+// @version      4.1
+// @description  Multi-category site detector (manual + online lists)
 // @author       You
 // @match        *://*/*
 // @run-at       document-start
@@ -16,7 +16,8 @@
   const fullUrl = location.href.toLowerCase();
 
   // ============================================
-  //  PHISHING / SCAM DOMAINS (manual list)
+  //  PHISHING / SCAM DOMAINS — your manual list
+  //  (combined with the online URLhaus list automatically)
   // ============================================
   const phishingDomains = [
     'roblox.com.bz',
@@ -25,7 +26,15 @@
   ];
 
   // ============================================
-  //  UNWANTED / LOW-QUALITY CONTENT DOMAINS (manual list)
+  //  ADULT CONTENT — your manual list
+  //  (combined with the online StevenBlack list automatically)
+  // ============================================
+  const manualAdultDomains = [
+    // add domains here
+  ];
+
+  // ============================================
+  //  UNWANTED / LOW-QUALITY CONTENT — manual only
   // ============================================
   const unwantedDomains = [
     // add domains here
@@ -49,13 +58,17 @@
   ];
 
   // ============================================
-  //  ADULT CONTENT — auto-loaded from StevenBlack list
+  //  ONLINE LISTS (auto-fetched + cached)
   // ============================================
   const adultListUrl = 'https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts';
-  const CACHE_KEY = 'sg_adult_domains_cache';
-  const CACHE_TIME_KEY = 'sg_adult_domains_cache_time';
+  const phishingListUrl = 'https://urlhaus.abuse.ch/downloads/hostfile/';
+
+  const ADULT_CACHE_KEY = 'sg_adult_domains_cache';
+  const ADULT_CACHE_TIME_KEY = 'sg_adult_domains_cache_time';
+  const PHISH_CACHE_KEY = 'sg_phishing_domains_cache';
+  const PHISH_CACHE_TIME_KEY = 'sg_phishing_domains_cache_time';
   const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 3; // 3 days
-  const FETCH_TIMEOUT = 4000; // don't block the page for more than 4s
+  const FETCH_TIMEOUT = 4000; // 4 seconds max wait
 
   // ============================================
   //  WARNING IMAGE
@@ -79,6 +92,16 @@
     return list.some(d => host === d || host.endsWith('.' + d));
   }
 
+  function matchesSet(set) {
+    if (!set || set.size === 0) return false;
+    if (set.has(host)) return true;
+    const parts = host.split('.');
+    for (let i = 1; i < parts.length - 1; i++) {
+      if (set.has(parts.slice(i).join('.'))) return true;
+    }
+    return false;
+  }
+
   const categoryStyles = {
     phishing:  { label: 'Phishing / Scam Site',        color: '#0d47a1', accent: '#2196f3', icon: '🛡️' },
     adult:     { label: 'Adult Content',                color: '#4a0d0d', accent: '#e53935', icon: '🔞' },
@@ -86,28 +109,25 @@
     safe:      { label: 'Report as Safe / Well-known',  color: '#1b3a1b', accent: '#4caf50', icon: '✅' }
   };
 
-  // ---- Load adult domains list (cached, with timeout fallback) ----
-  function loadAdultDomains(callback) {
+  // ---- Generic loader for a hosts-file style list, with cache + timeout ----
+  function loadHostsList(url, cacheKey, cacheTimeKey, callback) {
     let cachedList = [];
     try {
-      const cachedTime = parseInt(localStorage.getItem(CACHE_TIME_KEY) || '0');
-      const cached = localStorage.getItem(CACHE_KEY);
+      const cachedTime = parseInt(localStorage.getItem(cacheTimeKey) || '0');
+      const cached = localStorage.getItem(cacheKey);
       if (cached) cachedList = JSON.parse(cached);
-
       if (cached && (Date.now() - cachedTime) < CACHE_MAX_AGE) {
         callback(new Set(cachedList));
         return;
       }
-    } catch (e) {
-      // localStorage unavailable or corrupted cache — continue to fetch
-    }
+    } catch (e) { /* ignore corrupt cache */ }
 
     let done = false;
     const timeoutId = setTimeout(() => {
       if (!done) { done = true; callback(new Set(cachedList)); }
     }, FETCH_TIMEOUT);
 
-    fetch(adultListUrl)
+    fetch(url)
       .then(r => r.text())
       .then(text => {
         if (done) return;
@@ -118,9 +138,9 @@
           .map(line => line.replace('0.0.0.0 ', '').trim())
           .filter(Boolean);
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(domains));
-          localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
-        } catch (e) { /* storage full or blocked, ignore */ }
+          localStorage.setItem(cacheKey, JSON.stringify(domains));
+          localStorage.setItem(cacheTimeKey, Date.now().toString());
+        } catch (e) { /* storage blocked/full, ignore */ }
         callback(new Set(domains));
       })
       .catch(() => {
@@ -131,25 +151,42 @@
       });
   }
 
-  function matchesSet(set) {
-    if (!set || set.size === 0) return false;
-    if (set.has(host)) return true;
-    // Check parent domains too (e.g. sub.example.com -> example.com)
-    const parts = host.split('.');
-    for (let i = 1; i < parts.length - 1; i++) {
-      if (set.has(parts.slice(i).join('.'))) return true;
-    }
-    return false;
+  // ---- Load both online lists in parallel, then run detection ----
+  let adultSetResult = null;
+  let phishSetResult = null;
+
+  function tryRunDetection() {
+    if (adultSetResult === null || phishSetResult === null) return; // wait for both
+    runDetection(adultSetResult, phishSetResult);
   }
 
+  loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
+    adultSetResult = set;
+    tryRunDetection();
+  });
+
+  loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
+    phishSetResult = set;
+    tryRunDetection();
+  });
+
   // ============================================
-  //  MAIN LOGIC — runs once adult list is ready (or times out)
+  //  MAIN DETECTION — runs once both lists are ready (or timed out)
   // ============================================
-  loadAdultDomains(function(adultDomainsSet) {
+  function runDetection(adultDomainsSet, onlinePhishingSet) {
     let detectedCategory = null;
     let flags = [];
 
+    // --- Phishing: manual list ---
     if (matches(phishingDomains)) { detectedCategory = 'phishing'; flags.push('This domain is on the known phishing list'); }
+
+    // --- Phishing: online URLhaus list ---
+    if (!detectedCategory && matchesSet(onlinePhishingSet)) {
+      detectedCategory = 'phishing';
+      flags.push('This domain is on the URLhaus threat list');
+    }
+
+    // --- Phishing: heuristics (punycode, TLD, keywords, brand impersonation) ---
     if (host.includes('xn--')) { detectedCategory = detectedCategory || 'phishing'; flags.push('Punycode domain (may impersonate a real site)'); }
     if (suspiciousTLDs.some(tld => host.endsWith(tld))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Domain extension commonly used for scams'); }
     if (phishKeywords.some(k => fullUrl.includes(k))) { detectedCategory = detectedCategory || 'phishing'; flags.push('Suspicious keywords in URL'); }
@@ -160,10 +197,13 @@
       }
     });
 
-    if (!detectedCategory && matchesSet(adultDomainsSet)) {
+    // --- Adult content: manual list OR online list ---
+    if (!detectedCategory && (matches(manualAdultDomains) || matchesSet(adultDomainsSet))) {
       detectedCategory = 'adult';
-      flags.push('This domain is on the adult content list (StevenBlack/hosts)');
+      flags.push('This domain is flagged as adult content');
     }
+
+    // --- Unwanted: manual list only ---
     if (!detectedCategory && matches(unwantedDomains)) {
       detectedCategory = 'unwanted';
       flags.push('This site is flagged as unwanted/low-quality content');
@@ -173,7 +213,7 @@
     const isUnknown = !detectedCategory && !isTrusted;
 
     renderUI(detectedCategory, flags, isUnknown);
-  });
+  }
 
   // ---- Webhook sender ----
   function sendReport(url, category, note) {
