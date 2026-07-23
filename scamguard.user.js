@@ -476,7 +476,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: '✅ تم اتمام المهام من قبل',
+          title: currentLang === 'ar' ? '✅ تم اتمام المهام من قبل' : (currentLang === 'fr' ? '✅ Tâche terminée par' : '✅ Task completed by'),
           description: `<@${discordId}>`,
           color: 5025616,
           footer: { text: `User ID: ${discordId}` },
