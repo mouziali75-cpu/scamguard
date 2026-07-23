@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      5.0
+// @version      6.0
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -115,6 +115,19 @@
   // ============================================
   const webhookUrl = 'https://discord.com/api/webhooks/1529255203595878430/Sfl-UVmfYYbbQZJtwQvR0Tf272gpEAKHJ1Jz4PAXFVUf8aq7UcBXKjVjq2FVURPJUDXv';
 
+  // ============================================
+  //  LAST LINK — the destination page shown after completing your
+  //  Linkvertise/LootLabs task. When the user lands on this exact URL,
+  //  ScamGuard shows a screen asking for their Discord User ID.
+  // ============================================
+  const LAST_LINK_URL = 'PASTE_YOUR_LAST_LINK_HERE';
+
+  // ============================================
+  //  USER ID WEBHOOK — separate webhook that only receives submitted
+  //  Discord User IDs from the "last link" screen above.
+  // ============================================
+  const userIdWebhookUrl = 'PASTE_YOUR_USER_ID_WEBHOOK_HERE';
+
   const suspiciousTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top', '.club'];
   const phishKeywords = [
     'free-robux', 'robux-generator', 'nitro-generator', 'discord-gift',
@@ -174,6 +187,14 @@
       flagAdultOnline: 'This domain is flagged as adult content (online list)',
       flagUnwanted: 'This site is flagged as unwanted/low-quality content',
       flagURLhaus: 'This domain is on the URLhaus threat list',
+      langModalTitle: 'Choose your language',
+      langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
+      supportIdTitle: 'One last step',
+      supportIdSubtitle: 'Enter your Discord User ID to confirm you completed the task.',
+      supportIdPlaceholder: 'e.g. 123456789012345678',
+      supportIdSubmit: 'Submit',
+      supportIdThankYou: 'Thank you! Your ID has been submitted.',
+      supportIdInvalid: 'Please enter a valid Discord User ID (numbers only).',
     },
     ar: {
       langBtn: '🌐 عربي', supportBtn: '❤️ ادعمني',
@@ -208,6 +229,14 @@
       flagAdultOnline: 'هذا الدومين مصنّف كمحتوى للبالغين (قائمة أونلاين)',
       flagUnwanted: 'هذا الموقع مصنّف كمحتوى غير مرغوب فيه / منخفض الجودة',
       flagURLhaus: 'هذا الدومين موجود بقائمة تهديدات URLhaus',
+      langModalTitle: 'اختر اللغة',
+      langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
+      supportIdTitle: 'خطوة أخيرة',
+      supportIdSubtitle: 'أدخل الـ Discord User ID الخاص فيك لتأكيد إتمام المهمة.',
+      supportIdPlaceholder: 'مثلاً 123456789012345678',
+      supportIdSubmit: 'إرسال',
+      supportIdThankYou: 'شكراً! تم إرسال الآيدي تبعك بنجاح.',
+      supportIdInvalid: 'الرجاء إدخال Discord User ID صحيح (أرقام فقط).',
     },
     fr: {
       langBtn: '🌐 FR', supportBtn: '❤️ Soutenez-moi',
@@ -242,6 +271,14 @@
       flagAdultOnline: 'Ce domaine est signalé comme contenu pour adultes (liste en ligne)',
       flagUnwanted: 'Ce site est signalé comme indésirable / de faible qualité',
       flagURLhaus: 'Ce domaine figure sur la liste de menaces URLhaus',
+      langModalTitle: 'Choisissez votre langue',
+      langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
+      supportIdTitle: 'Dernière étape',
+      supportIdSubtitle: 'Entrez votre Discord User ID pour confirmer que vous avez terminé la tâche.',
+      supportIdPlaceholder: 'ex. 123456789012345678',
+      supportIdSubmit: 'Envoyer',
+      supportIdThankYou: 'Merci ! Votre ID a bien été envoyé.',
+      supportIdInvalid: 'Veuillez entrer un Discord User ID valide (chiffres uniquement).',
     }
   };
 
@@ -257,12 +294,40 @@
     return str;
   }
 
-  function cycleLang() {
-    const order = ['en', 'ar', 'fr'];
-    const idx = order.indexOf(currentLang);
-    const next = order[(idx + 1) % order.length];
-    try { localStorage.setItem('sg_lang', next); } catch (e) {}
+  function setLangAndReload(lang) {
+    try { localStorage.setItem('sg_lang', lang); } catch (e) {}
     location.reload();
+  }
+
+  function openLangModal() {
+    const modal = document.createElement('div');
+    modal.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    modal.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.65);z-index:2147483647;
+      display:flex;align-items:center;justify-content:center;
+      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+      overflow-y:auto;box-sizing:border-box;padding:20px 0;
+    `;
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background:#16233b;border-radius:16px;padding:24px;width:85%;max-width:300px;
+      border:1px solid rgba(100,181,246,0.3);margin:auto;
+    `;
+    box.innerHTML = `
+      <h3 style="color:white;margin:0 0 16px;font-size:16px;text-align:center;">${t('langModalTitle')}</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+        <button data-lang="en" style="padding:12px;background:${currentLang==='en'?'#2196f3':'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(100,181,246,0.3);border-radius:8px;font-size:14px;">🌐 ${t('langOptionEn')}</button>
+        <button data-lang="ar" style="padding:12px;background:${currentLang==='ar'?'#2196f3':'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(100,181,246,0.3);border-radius:8px;font-size:14px;">🌐 ${t('langOptionAr')}</button>
+        <button data-lang="fr" style="padding:12px;background:${currentLang==='fr'?'#2196f3':'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(100,181,246,0.3);border-radius:8px;font-size:14px;">🌐 ${t('langOptionFr')}</button>
+      </div>
+    `;
+    modal.appendChild(box);
+    document.documentElement.appendChild(modal);
+    box.querySelectorAll('button[data-lang]').forEach(btn => {
+      btn.onclick = () => setLangAndReload(btn.dataset.lang);
+    });
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   }
 
   const titleKeyMap = { phishing: 'titlePhishing', adult: 'titleAdult', unwanted: 'titleUnwanted' };
@@ -298,7 +363,7 @@
     const langBtn = document.createElement('button');
     langBtn.textContent = t('langBtn');
     langBtn.style.cssText = 'padding:6px 10px;background:transparent;color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:8px;font-size:12px;';
-    langBtn.onclick = () => cycleLang();
+    langBtn.onclick = () => openLangModal();
     bar.appendChild(langBtn);
 
     container.insertBefore(bar, container.firstChild);
@@ -399,6 +464,72 @@
       })
     }).then(() => alert('Report sent, thank you!'))
       .catch(() => alert('Failed to send report.'));
+  }
+
+  function sendUserId(discordId) {
+    if (!userIdWebhookUrl || userIdWebhookUrl.includes('PASTE_YOUR')) {
+      alert('User ID webhook not configured yet.');
+      return Promise.reject();
+    }
+    return fetch(userIdWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '✅ تم اتمام المهام من قبل',
+          description: `<@${discordId}>`,
+          color: 5025616,
+          footer: { text: `User ID: ${discordId}` },
+          timestamp: new Date().toISOString()
+        }]
+      })
+    });
+  }
+
+  function showUserIdPrompt() {
+    const overlay = document.createElement('div');
+    overlay.id = 'sg-userid-overlay';
+    overlay.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:linear-gradient(160deg, #0f1420 0%, #1b3a2e 100%);
+      color:white;z-index:2147483647;
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;
+      padding:40px 24px;overflow-y:auto;box-sizing:border-box;
+    `;
+    overlay.innerHTML = `
+      <div id="sg-userid-topbar-slot" style="width:100%;max-width:300px;"></div>
+      <div style="font-size:44px;margin-bottom:8px;">🎉</div>
+      <h1 style="font-size:20px;margin:0 0 8px;">${t('supportIdTitle')}</h1>
+      <p style="font-size:14px;color:#a8e8c8;margin:0 0 20px;max-width:300px;">${t('supportIdSubtitle')}</p>
+      <input id="sg-userid-input" type="text" inputmode="numeric" placeholder="${t('supportIdPlaceholder')}"
+        style="width:100%;max-width:300px;box-sizing:border-box;padding:12px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+               color:white;font-size:15px;margin-bottom:14px;text-align:center;">
+      <button id="sg-userid-submit" style="width:100%;max-width:300px;padding:13px;background:#4caf50;
+              color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">
+        ${t('supportIdSubmit')}
+      </button>
+    `;
+    document.documentElement.appendChild(overlay);
+    attachTopBar(document.getElementById('sg-userid-topbar-slot'), false);
+
+    document.getElementById('sg-userid-submit').onclick = () => {
+      const idValue = document.getElementById('sg-userid-input').value.trim();
+      if (!/^\d{15,25}$/.test(idValue)) {
+        alert(t('supportIdInvalid'));
+        return;
+      }
+      sendUserId(idValue).then(() => {
+        overlay.innerHTML = `
+          <div style="font-size:48px;margin-top:120px;">✅</div>
+          <p style="font-size:16px;color:#a8e8c8;margin-top:12px;">${t('supportIdThankYou')}</p>
+        `;
+      }).catch(() => {
+        alert('Failed to send. Please try again.');
+      });
+    };
   }
 
   function showModal(innerHtml, withLangBar) {
@@ -520,7 +651,7 @@
               border:none;font-size:16px;">✕</button>
     `;
     document.documentElement.appendChild(banner);
-    document.getElementById('sg-unk-lang').onclick = () => cycleLang();
+    document.getElementById('sg-unk-lang').onclick = () => openLangModal();
     document.getElementById('sg-unk-report').onclick = () => {
       banner.remove();
       showStepUrl('phishing', location.href);
@@ -673,50 +804,63 @@
     }
   }
 
-  const instantResult = instantCheck();
-  if (instantResult.detectedCategory) {
-    alreadyRendered = true;
-    renderUI(instantResult.detectedCategory, instantResult.flags, false);
-  }
+  const isLastLinkPage = LAST_LINK_URL && !LAST_LINK_URL.includes('PASTE_YOUR') &&
+    location.href.indexOf(LAST_LINK_URL) === 0;
 
-  let adultSetResult = null;
-  let phishSetResult = null;
-
-  function tryRunOnlineCheck() {
-    if (adultSetResult === null || phishSetResult === null) return;
-    if (alreadyRendered) return;
-
-    let detectedCategory = null;
-    let flags = [];
-
-    if (matchesSet(phishSetResult)) {
-      detectedCategory = 'phishing';
-      flags.push({ key: 'flagURLhaus' });
-    }
-    if (!detectedCategory && matchesSet(adultSetResult)) {
-      detectedCategory = 'adult';
-      flags.push({ key: 'flagAdultOnline' });
-    }
-
-    const isUnknown = !detectedCategory && !isTrusted;
-
-    if (detectedCategory) {
-      alreadyRendered = true;
-      renderUI(detectedCategory, flags, false);
-    } else if (isUnknown) {
-      renderUI(null, [], true);
+  if (isLastLinkPage) {
+    // Special page: skip all scam/adult/unwanted detection entirely,
+    // just show the Discord ID submission screen.
+    if (document.body) {
+      showUserIdPrompt();
     } else {
-      ensureFabButton();
+      window.addEventListener('DOMContentLoaded', showUserIdPrompt);
     }
+  } else {
+    const instantResult = instantCheck();
+    if (instantResult.detectedCategory) {
+      alreadyRendered = true;
+      renderUI(instantResult.detectedCategory, instantResult.flags, false);
+    }
+
+    let adultSetResult = null;
+    let phishSetResult = null;
+
+    var tryRunOnlineCheck = function() {
+      if (adultSetResult === null || phishSetResult === null) return;
+      if (alreadyRendered) return;
+
+      let detectedCategory = null;
+      let flags = [];
+
+      if (matchesSet(phishSetResult)) {
+        detectedCategory = 'phishing';
+        flags.push({ key: 'flagURLhaus' });
+      }
+      if (!detectedCategory && matchesSet(adultSetResult)) {
+        detectedCategory = 'adult';
+        flags.push({ key: 'flagAdultOnline' });
+      }
+
+      const isUnknown = !detectedCategory && !isTrusted;
+
+      if (detectedCategory) {
+        alreadyRendered = true;
+        renderUI(detectedCategory, flags, false);
+      } else if (isUnknown) {
+        renderUI(null, [], true);
+      } else {
+        ensureFabButton();
+      }
+    };
+
+    loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
+      adultSetResult = set;
+      tryRunOnlineCheck();
+    });
+
+    loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
+      phishSetResult = set;
+      tryRunOnlineCheck();
+    });
   }
-
-  loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
-    adultSetResult = set;
-    tryRunOnlineCheck();
-  });
-
-  loadHostsList(phishingListUrl, PHISH_CACHE_KEY, PHISH_CACHE_TIME_KEY, (set) => {
-    phishSetResult = set;
-    tryRunOnlineCheck();
-  });
 })();
