@@ -476,7 +476,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: '✅ Task completed by',
+          title: '✅ Tasks completed by',
           description: `<@${discordId}>`,
           color: 5025616,
           footer: { text: `User ID: ${discordId}` },
