@@ -102,13 +102,13 @@
   //  DISCLAIMER SCREEN IMAGE (shown when user taps "Continue anyway")
   //  Leave empty '' to use the warning emoji instead
   // ============================================
-  const disclaimerImageUrl = 'https://i.postimg.cc/zGp4MXng/IMG-20260722-202347.jpg';
+  const disclaimerImageUrl = 'https://i.postimg.cc/W4WVbq2L/Photoroom-20260723-124401.png';
 
   // ============================================
   //  SUPPORT / DONATION LINK
   //  Paste your Linkvertise / LootLabs / Ko-fi link here
   // ============================================
-  const SUPPORT_LINK_URL = 'https://loot-link.com/s?3rIpOXoe';
+  const SUPPORT_LINK_URL = 'https://sub4unlock.com/S/r4bgr';
 
   // ============================================
   //  DISCORD WEBHOOK URL
@@ -120,13 +120,13 @@
   //  Linkvertise/LootLabs task. When the user lands on this exact URL,
   //  ScamGuard shows a screen asking for their Discord User ID.
   // ============================================
-  const LAST_LINK_URL = 'PASTE_YOUR_LAST_LINK_HERE';
+  const LAST_LINK_URL = 'https://i.postimg.cc/c1TqBnqW/images-(1).jpg';
 
   // ============================================
   //  USER ID WEBHOOK — separate webhook that only receives submitted
   //  Discord User IDs from the "last link" screen above.
   // ============================================
-  const userIdWebhookUrl = 'PASTE_YOUR_USER_ID_WEBHOOK_HERE';
+  const userIdWebhookUrl = 'https://discord.com/api/webhooks/1529810880173314061/BozXvpkS3N0EDW3Sce0JzXjz5mGyrqZZoQ-0t2qZecua1r9xD2P5EU6nGtiga1sg35sZ';
 
   const suspiciousTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top', '.club'];
   const phishKeywords = [
