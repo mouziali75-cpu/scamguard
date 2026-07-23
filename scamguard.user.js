@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      6.0
+// @version      6.1
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -195,6 +195,9 @@
       supportIdSubmit: 'Submit',
       supportIdThankYou: 'Thank you! Your ID has been submitted.',
       supportIdInvalid: 'Please enter a valid Discord User ID (numbers only).',
+      reportIdTitle: 'Your Discord User ID',
+      reportIdSubtitle: 'So we can credit you for this report.',
+      reportIdPlaceholder: 'e.g. 123456789012345678',
     },
     ar: {
       langBtn: '🌐 عربي', supportBtn: '❤️ ادعمني',
@@ -237,6 +240,9 @@
       supportIdSubmit: 'إرسال',
       supportIdThankYou: 'شكراً! تم إرسال الآيدي تبعك بنجاح.',
       supportIdInvalid: 'الرجاء إدخال Discord User ID صحيح (أرقام فقط).',
+      reportIdTitle: 'الـ Discord User ID الخاص فيك',
+      reportIdSubtitle: 'حتى نقدر ننسب لك هالبلاغ.',
+      reportIdPlaceholder: 'مثلاً 123456789012345678',
     },
     fr: {
       langBtn: '🌐 FR', supportBtn: '❤️ Soutenez-moi',
@@ -279,6 +285,9 @@
       supportIdSubmit: 'Envoyer',
       supportIdThankYou: 'Merci ! Votre ID a bien été envoyé.',
       supportIdInvalid: 'Veuillez entrer un Discord User ID valide (chiffres uniquement).',
+      reportIdTitle: 'Votre Discord User ID',
+      reportIdSubtitle: 'Pour que nous puissions vous créditer ce signalement.',
+      reportIdPlaceholder: 'ex. 123456789012345678',
     }
   };
 
@@ -440,13 +449,26 @@
   const isTrusted = matches(trustedDomains);
   let alreadyRendered = false;
 
-  function sendReport(url, category, note) {
+  function sendReport(url, category, note, discordId) {
     if (!webhookUrl || webhookUrl.includes('PASTE_YOUR')) {
       alert('Webhook not configured yet.');
       return;
     }
     const colorMap = { phishing: 2201331, adult: 15158332, unwanted: 16098851, safe: 5025616 };
-    const catLabelMap = { phishing: t('catPhishing'), adult: t('catAdult'), unwanted: t('catUnwanted'), safe: t('catSafe') };
+    const catLabelMapEn = {
+      phishing: '🛡️ Phishing / Scam',
+      adult: '🔞 Adult Content',
+      unwanted: '⚠️ Unwanted / Spam',
+      safe: '✅ Well-known / Safe Site'
+    };
+    const fields = [
+      { name: 'Category', value: catLabelMapEn[category] },
+      { name: 'URL / Domain', value: url },
+      { name: 'Description', value: note || 'No description provided' }
+    ];
+    if (discordId) {
+      fields.push({ name: 'Reported by', value: `<@${discordId}>` });
+    }
     fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -454,11 +476,7 @@
         embeds: [{
           title: category === 'safe' ? '✅ Suggested Trusted Domain' : '🚩 New Site Report',
           color: colorMap[category] || 15158332,
-          fields: [
-            { name: 'Category', value: catLabelMap[category] },
-            { name: 'URL / Domain', value: url },
-            { name: 'Description', value: note || 'No description provided' }
-          ],
+          fields: fields,
           timestamp: new Date().toISOString()
         }]
       })
@@ -476,7 +494,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: '✅ Tasks completed by',
+          title: '✅ تم اتمام المهام من قبل',
           description: `<@${discordId}>`,
           color: 5025616,
           footer: { text: `User ID: ${discordId}` },
@@ -572,11 +590,41 @@
     document.getElementById('sg-submit').onclick = () => {
       const note = document.getElementById('sg-note').value;
       modal.remove();
-      sendReport(url, category, note);
+      showStepReportId(category, url, note);
     };
     document.getElementById('sg-back').onclick = () => {
       modal.remove();
       showStepUrl(category);
+    };
+  }
+
+  function showStepReportId(category, url, note) {
+    const modal = showModal(`
+      <h3 style="color:white;margin:0 0 4px;font-size:17px;">${t('reportIdTitle')}</h3>
+      <p style="color:#7fa8d9;font-size:13px;margin:0 0 16px;">${t('reportIdSubtitle')}</p>
+      <input id="sg-report-id" type="text" inputmode="numeric" placeholder="${t('reportIdPlaceholder')}"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+               color:white;font-size:13px;margin-bottom:16px;text-align:center;">
+      <button id="sg-report-id-submit" style="width:100%;padding:12px;background:#4caf50;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:8px;">
+        ${t('submitBtn')}
+      </button>
+      <button id="sg-back" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;">${t('backBtn')}</button>
+    `, true);
+    document.getElementById('sg-report-id-submit').onclick = () => {
+      const idValue = document.getElementById('sg-report-id').value.trim();
+      if (!/^\d{15,25}$/.test(idValue)) {
+        alert(t('supportIdInvalid'));
+        return;
+      }
+      modal.remove();
+      sendReport(url, category, note, idValue);
+    };
+    document.getElementById('sg-back').onclick = () => {
+      modal.remove();
+      showStepDescription(category, url);
     };
   }
 
@@ -766,11 +814,7 @@
           <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
           <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
                   color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">${t('leaveBtn')}</button>
-          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
-                  border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
-            ${t('continueBtn')}
-          </button>
-          <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
                   color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
             ${t('reportBtn')}
           </button>
