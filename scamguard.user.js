@@ -378,7 +378,7 @@
     container.insertBefore(bar, container.firstChild);
   }
 
-  // ---- Generic loader for a hosts-file style list, with cache + timeout ----
+  // ----Generic loader for a hosts-file style list, with cache + timeout ----
   function loadHostsList(url, cacheKey, cacheTimeKey, callback) {
     let cachedList = [];
     try {
@@ -814,7 +814,11 @@
           <p style="font-size:13px;color:#a8c8ea;margin:0 0 20px;word-break:break-all;">${host}</p>
           <button id="sg-leave" style="width:100%;max-width:280px;padding:13px;margin-bottom:10px;background:${style.accent};
                   color:white;border:none;border-radius:10px;font-weight:600;font-size:15px;">${t('leaveBtn')}</button>
-          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
+          <button id="sg-continue" style="width:100%;max-width:280px;padding:11px;margin-bottom:10px;background:transparent;color:#a8c8ea;
+                  border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
+            ${t('continueBtn')}
+          </button>
+          <button id="sg-report-btn" style="width:100%;max-width:280px;padding:11px;margin-bottom:20px;background:transparent;
                   color:#a8c8ea;border:1px solid rgba(168,200,234,0.4);border-radius:10px;font-size:14px;">
             ${t('reportBtn')}
           </button>
@@ -895,7 +899,7 @@
       } else {
         ensureFabButton();
       }
-    };
+     };
 
     loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
       adultSetResult = set;
