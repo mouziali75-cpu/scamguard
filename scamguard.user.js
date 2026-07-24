@@ -136,11 +136,11 @@
 
   // Webhook that logs every domain you add via the Admin Panel,
   // so you remember to copy it into the GitHub source lists later.
-  const adminWebhookUrl = 'PASTE_YOUR_ADMIN_WEBHOOK_HERE';
+  const adminWebhookUrl = 'https://discord.com/api/webhooks/1530337337735643378/wOVbDO6Pvio4k3_H1PMkoxr1PmPZgzCf1Lo43d8dHdowCsuQ7knrZbZtr03BLVjwyM0f';
 
   // Optional: sends a usage summary to this webhook roughly every 7 days
   // (based on this device's local activity only — not global stats).
-  const statsWebhookUrl = 'PASTE_YOUR_STATS_WEBHOOK_HERE';
+  const statsWebhookUrl = 'https://discord.com/api/webhooks/1530337590488858804/54TfO9qLEKslu-F_TtXeWyxsKvgnYHWbFAvPz509NVywlw9lbqmmtWuxnqG2y5VYx9bL';
 
   // ============================================
   //  DANGEROUS FILE EXTENSIONS — flags links pointing to risky downloads
