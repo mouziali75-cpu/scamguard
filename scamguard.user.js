@@ -132,7 +132,7 @@
   //  ADMIN PANEL — now verified by your Discord bot, not this script.
   //  Paste the URL where your scamguard-bot is hosted (Bot-Hosting.net).
   // ============================================
-  const ADMIN_API_URL = 'PASTE_YOUR_BOT_API_URL_HERE'; // e.g. https://your-bot.bot-hosting.net
+  const ADMIN_API_URL = 'http://fi5.bot-hosting.net:21119'; // e.g. https://your-bot.bot-hosting.net
 
   // Webhook that logs every domain you add via the Admin Panel,
   // so you remember to copy it into the GitHub source lists later.
