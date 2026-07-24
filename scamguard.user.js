@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      6.1
+// @version      8.0
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -128,6 +128,25 @@
   // ============================================
   const userIdWebhookUrl = 'https://discord.com/api/webhooks/1529810880173314061/BozXvpkS3N0EDW3Sce0JzXjz5mGyrqZZoQ-0t2qZecua1r9xD2P5EU6nGtiga1sg35sZ';
 
+  // ============================================
+  //  ADMIN PANEL — now verified by your Discord bot, not this script.
+  //  Paste the URL where your scamguard-bot is hosted (Bot-Hosting.net).
+  // ============================================
+  const ADMIN_API_URL = 'PASTE_YOUR_BOT_API_URL_HERE'; // e.g. https://your-bot.bot-hosting.net
+
+  // Webhook that logs every domain you add via the Admin Panel,
+  // so you remember to copy it into the GitHub source lists later.
+  const adminWebhookUrl = 'PASTE_YOUR_ADMIN_WEBHOOK_HERE';
+
+  // Optional: sends a usage summary to this webhook roughly every 7 days
+  // (based on this device's local activity only — not global stats).
+  const statsWebhookUrl = 'PASTE_YOUR_STATS_WEBHOOK_HERE';
+
+  // ============================================
+  //  DANGEROUS FILE EXTENSIONS — flags links pointing to risky downloads
+  // ============================================
+  const dangerousExtensions = ['.exe', '.scr', '.bat', '.cmd', '.msi', '.jar', '.vbs', '.apk', '.ps1', '.com.exe'];
+
   const suspiciousTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top', '.club'];
   const phishKeywords = [
     'free-robux', 'robux-generator', 'nitro-generator', 'discord-gift',
@@ -148,6 +167,62 @@
       if (set.has(parts.slice(i).join('.'))) return true;
     }
     return false;
+  }
+
+  // ---- Levenshtein distance (for typosquat / look-alike domain detection) ----
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    return dp[m][n];
+  }
+
+  // Well-known names to compare against for look-alike detection
+  const wellKnownNames = [
+    'discord', 'roblox', 'steam', 'google', 'paypal', 'instagram',
+    'facebook', 'youtube', 'netflix', 'microsoft', 'apple', 'amazon',
+    'whatsapp', 'telegram', 'twitter', 'tiktok'
+  ];
+
+  function checkLookAlike(hostname) {
+    // Take the main label of the domain (e.g. "robl0x" from "robl0x.com")
+    const parts = hostname.split('.');
+    if (parts.length < 2) return null;
+    const mainLabel = parts[parts.length - 2];
+    if (!mainLabel || mainLabel.length < 3) return null;
+
+    for (const brand of wellKnownNames) {
+      if (mainLabel === brand) continue; // exact match handled elsewhere (trusted list)
+      const dist = levenshtein(mainLabel, brand);
+      if (dist > 0 && dist <= 2 && Math.abs(mainLabel.length - brand.length) <= 2) {
+        return brand;
+      }
+    }
+    return null;
+  }
+
+  // ---- Admin-added domains (stored locally, merged with hardcoded lists) ----
+  function getAdminDomains(category) {
+    try {
+      const raw = localStorage.getItem('sg_admin_' + category);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+
+  function addAdminDomain(category, domain) {
+    const list = getAdminDomains(category);
+    if (!list.includes(domain)) {
+      list.push(domain);
+      try { localStorage.setItem('sg_admin_' + category, JSON.stringify(list)); } catch (e) {}
+    }
   }
 
   // ============================================
@@ -187,6 +262,16 @@
       flagAdultOnline: 'This domain is flagged as adult content (online list)',
       flagUnwanted: 'This site is flagged as unwanted/low-quality content',
       flagURLhaus: 'This domain is on the URLhaus threat list',
+      flagLookAlike: 'Domain closely resembles "{brand}" (possible typosquat)',
+      flagDangerousFile: 'Link points to a potentially dangerous file type',
+      adminPinTitle: 'Admin Access', adminPinPlaceholder: 'Enter PIN',
+      adminPinSubmit: 'Unlock', adminPinWrong: 'Incorrect PIN.',
+      adminPanelTitle: 'Admin Panel', adminCategoryLabel: 'Category',
+      adminDomainPlaceholder: 'e.g. fake-site.com', adminAddBtn: 'Add Domain',
+      adminAdded: 'Domain added and logged.',
+      adminImportLabel: 'Import from .txt file (one domain per line)',
+      adminImportBtn: 'Import File', adminImported: '{count} domains imported.',
+      closeBtn: 'Close',
       langModalTitle: 'Choose your language',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'One last step',
@@ -232,6 +317,16 @@
       flagAdultOnline: 'هذا الدومين مصنّف كمحتوى للبالغين (قائمة أونلاين)',
       flagUnwanted: 'هذا الموقع مصنّف كمحتوى غير مرغوب فيه / منخفض الجودة',
       flagURLhaus: 'هذا الدومين موجود بقائمة تهديدات URLhaus',
+      flagLookAlike: 'الدومين يشبه كتير "{brand}" (احتمال تقليد)',
+      flagDangerousFile: 'الرابط يوجه لملف قد يكون خطيراً',
+      adminPinTitle: 'دخول الأدمن', adminPinPlaceholder: 'أدخل الرمز السري',
+      adminPinSubmit: 'فتح', adminPinWrong: 'الرمز السري خاطئ.',
+      adminPanelTitle: 'لوحة الأدمن', adminCategoryLabel: 'الفئة',
+      adminDomainPlaceholder: 'مثلاً fake-site.com', adminAddBtn: 'إضافة الدومين',
+      adminAdded: 'تمت إضافة الدومين وتسجيله.',
+      adminImportLabel: 'استيراد من ملف .txt (دومين بكل سطر)',
+      adminImportBtn: 'استيراد الملف', adminImported: 'تم استيراد {count} دومين.',
+      closeBtn: 'إغلاق',
       langModalTitle: 'اختر اللغة',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'خطوة أخيرة',
@@ -277,6 +372,16 @@
       flagAdultOnline: 'Ce domaine est signalé comme contenu pour adultes (liste en ligne)',
       flagUnwanted: 'Ce site est signalé comme indésirable / de faible qualité',
       flagURLhaus: 'Ce domaine figure sur la liste de menaces URLhaus',
+      flagLookAlike: 'Le domaine ressemble beaucoup à "{brand}" (possible imitation)',
+      flagDangerousFile: 'Le lien pointe vers un type de fichier potentiellement dangereux',
+      adminPinTitle: 'Accès admin', adminPinPlaceholder: 'Entrez le code',
+      adminPinSubmit: 'Déverrouiller', adminPinWrong: 'Code incorrect.',
+      adminPanelTitle: 'Panneau admin', adminCategoryLabel: 'Catégorie',
+      adminDomainPlaceholder: 'ex. fake-site.com', adminAddBtn: 'Ajouter le domaine',
+      adminAdded: 'Domaine ajouté et enregistré.',
+      adminImportLabel: 'Importer un fichier .txt (un domaine par ligne)',
+      adminImportBtn: 'Importer le fichier', adminImported: '{count} domaines importés.',
+      closeBtn: 'Fermer',
       langModalTitle: 'Choisissez votre langue',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'Dernière étape',
@@ -378,7 +483,7 @@
     container.insertBefore(bar, container.firstChild);
   }
 
-  // ----Generic loader for a hosts-file style list, with cache + timeout ----
+  // ---- Generic loader for a hosts-file style list, with cache + timeout ----
   function loadHostsList(url, cacheKey, cacheTimeKey, callback) {
     let cachedList = [];
     try {
@@ -424,7 +529,11 @@
     let detectedCategory = null;
     let flags = [];
 
-    if (matches(phishingDomains)) { detectedCategory = 'phishing'; flags.push({ key: 'flagPhishingList' }); }
+    const allPhishingDomains = phishingDomains.concat(getAdminDomains('phishing'));
+    const allAdultDomains = manualAdultDomains.concat(getAdminDomains('adult'));
+    const allUnwantedDomains = unwantedDomains.concat(getAdminDomains('unwanted'));
+
+    if (matches(allPhishingDomains)) { detectedCategory = 'phishing'; flags.push({ key: 'flagPhishingList' }); }
     if (host.includes('xn--')) { detectedCategory = detectedCategory || 'phishing'; flags.push({ key: 'flagPunycode' }); }
     if (suspiciousTLDs.some(tld => host.endsWith(tld))) { detectedCategory = detectedCategory || 'phishing'; flags.push({ key: 'flagTLD' }); }
     if (phishKeywords.some(k => fullUrl.includes(k))) { detectedCategory = detectedCategory || 'phishing'; flags.push({ key: 'flagKeyword' }); }
@@ -434,11 +543,22 @@
         flags.push({ key: 'flagBrand', params: { brand } });
       }
     });
-    if (!detectedCategory && matches(manualAdultDomains)) {
+    if (!isTrustedGlobal) {
+      const lookAlikeBrand = checkLookAlike(host);
+      if (lookAlikeBrand) {
+        detectedCategory = detectedCategory || 'phishing';
+        flags.push({ key: 'flagLookAlike', params: { brand: lookAlikeBrand } });
+      }
+    }
+    if (dangerousExtensions.some(ext => fullUrl.split('?')[0].endsWith(ext))) {
+      detectedCategory = detectedCategory || 'phishing';
+      flags.push({ key: 'flagDangerousFile' });
+    }
+    if (!detectedCategory && matches(allAdultDomains)) {
       detectedCategory = 'adult';
       flags.push({ key: 'flagAdultManual' });
     }
-    if (!detectedCategory && matches(unwantedDomains)) {
+    if (!detectedCategory && matches(allUnwantedDomains)) {
       detectedCategory = 'unwanted';
       flags.push({ key: 'flagUnwanted' });
     }
@@ -446,7 +566,63 @@
     return { detectedCategory, flags };
   }
 
-  const isTrusted = matches(trustedDomains);
+  const isTrustedGlobal = matches(trustedDomains);
+  const isTrusted = isTrustedGlobal;
+
+  // ---- Local usage stats (per-device only) + weekly summary ----
+  function bumpStat(key) {
+    try {
+      const current = parseInt(localStorage.getItem(key) || '0');
+      localStorage.setItem(key, (current + 1).toString());
+    } catch (e) {}
+  }
+
+  function maybeSendWeeklyStats() {
+    if (!statsWebhookUrl || statsWebhookUrl.includes('PASTE_YOUR')) return;
+    try {
+      const lastPost = parseInt(localStorage.getItem('sg_stats_last_post') || '0');
+      const weekMs = 1000 * 60 * 60 * 24 * 7;
+      if (Date.now() - lastPost < weekMs) return;
+
+      const detections = parseInt(localStorage.getItem('sg_stats_detections') || '0');
+      const reports = parseInt(localStorage.getItem('sg_stats_reports') || '0');
+
+      fetch(statsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeds: [{
+            title: '📊 Weekly ScamGuard Stats (this device)',
+            color: 3901635,
+            fields: [
+              { name: 'Sites detected', value: String(detections), inline: true },
+              { name: 'Reports submitted', value: String(reports), inline: true }
+            ],
+            timestamp: new Date().toISOString()
+          }]
+        })
+      }).catch(() => {});
+
+      localStorage.setItem('sg_stats_detections', '0');
+      localStorage.setItem('sg_stats_reports', '0');
+      localStorage.setItem('sg_stats_last_post', Date.now().toString());
+    } catch (e) {}
+  }
+
+  // ---- Reporter trust (tracked locally by submitted Discord ID) ----
+  function getReportCountForId(discordId) {
+    try {
+      return parseInt(localStorage.getItem('sg_reporter_' + discordId) || '0');
+    } catch (e) { return 0; }
+  }
+
+  function bumpReportCountForId(discordId) {
+    try {
+      const count = getReportCountForId(discordId) + 1;
+      localStorage.setItem('sg_reporter_' + discordId, count.toString());
+      return count;
+    } catch (e) { return 1; }
+  }
   let alreadyRendered = false;
 
   function sendReport(url, category, note, discordId) {
@@ -467,8 +643,12 @@
       { name: 'Description', value: note || 'No description provided' }
     ];
     if (discordId) {
-      fields.push({ name: 'Reported by', value: `<@${discordId}>` });
+      const reportCount = bumpReportCountForId(discordId);
+      let reporterLine = `<@${discordId}>`;
+      if (reportCount >= 3) reporterLine += `  🌟 Trusted Reporter (${reportCount} reports)`;
+      fields.push({ name: 'Reported by', value: reporterLine });
     }
+    bumpStat('sg_stats_reports');
     fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -711,6 +891,167 @@
     document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
   }
 
+  function sendAdminLog(category, domain) {
+    if (!adminWebhookUrl || adminWebhookUrl.includes('PASTE_YOUR')) return;
+    fetch(adminWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '🛠️ Admin Domain Added',
+          color: 10181046,
+          fields: [
+            { name: 'Category', value: category },
+            { name: 'Domain', value: domain }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      })
+    }).catch(() => {});
+  }
+
+  function openAdminPanel() {
+    const modal = showModal(`
+      <h3 style="color:white;margin:0 0 16px;font-size:17px;">${t('adminPanelTitle')}</h3>
+
+      <p style="color:#7fa8d9;font-size:13px;margin:0 0 6px;">${t('adminCategoryLabel')}</p>
+      <select id="sg-admin-cat" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+              background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+              color:white;font-size:13px;margin-bottom:12px;">
+        <option value="phishing" style="color:black;">🛡️ Phishing / Scam</option>
+        <option value="adult" style="color:black;">🔞 Adult Content</option>
+        <option value="unwanted" style="color:black;">⚠️ Unwanted / Spam</option>
+      </select>
+
+      <input id="sg-admin-domain" type="text" placeholder="${t('adminDomainPlaceholder')}"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+               color:white;font-size:13px;margin-bottom:10px;">
+      <button id="sg-admin-add" style="width:100%;padding:12px;background:#4caf50;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:20px;">
+        ${t('adminAddBtn')}
+      </button>
+
+      <p style="color:#7fa8d9;font-size:12px;margin:0 0 8px;">${t('adminImportLabel')}</p>
+      <input id="sg-admin-file" type="file" accept=".txt"
+        style="width:100%;color:#cfe4ff;font-size:12px;margin-bottom:10px;">
+      <button id="sg-admin-import" style="width:100%;padding:11px;background:#2196f3;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:16px;">
+        ${t('adminImportBtn')}
+      </button>
+
+      <button id="sg-admin-close" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;">${t('closeBtn')}</button>
+    `, true);
+
+    document.getElementById('sg-admin-add').onclick = () => {
+      const cat = document.getElementById('sg-admin-cat').value;
+      const domain = document.getElementById('sg-admin-domain').value.trim().toLowerCase();
+      if (!domain) return;
+      addAdminDomain(cat, domain);
+      sendAdminLog(cat, domain);
+      alert(t('adminAdded'));
+      document.getElementById('sg-admin-domain').value = '';
+    };
+
+    document.getElementById('sg-admin-import').onclick = () => {
+      const cat = document.getElementById('sg-admin-cat').value;
+      const fileInput = document.getElementById('sg-admin-file');
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = String(reader.result).split('\n')
+          .map(l => l.trim().toLowerCase())
+          .filter(Boolean);
+        lines.forEach(d => addAdminDomain(cat, d));
+        sendAdminLog(cat, `(bulk import: ${lines.length} domains)`);
+        alert(t('adminImported', { count: lines.length }));
+      };
+      reader.readAsText(file);
+    };
+
+    document.getElementById('sg-admin-close').onclick = () => modal.remove();
+  }
+
+  function sendAdminAccessLog() { /* now handled entirely by the bot */ }
+
+  function pollAdminStatus(requestId, modal, statusEl) {
+    let attempts = 0;
+    const maxAttempts = 150; // ~5 minutes at 2s interval
+    const interval = setInterval(() => {
+      attempts++;
+      fetch(`${ADMIN_API_URL}/admin-status/${requestId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'accepted') {
+            clearInterval(interval);
+            modal.remove();
+            openAdminPanel();
+          } else if (data.status === 'denied') {
+            clearInterval(interval);
+            statusEl.textContent = t('adminPinWrong');
+          } else if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            statusEl.textContent = 'Request timed out. Please try again.';
+          }
+        })
+        .catch(() => {
+          if (attempts >= maxAttempts) clearInterval(interval);
+        });
+    }, 2000);
+  }
+
+  function openAdminGate() {
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) {
+      alert('Admin bot not configured yet.');
+      return;
+    }
+    const modal = showModal(`
+      <h3 style="color:white;margin:0 0 16px;font-size:17px;">${t('adminPinTitle')}</h3>
+      <input id="sg-admin-pin" type="password" inputmode="numeric" placeholder="${t('adminPinPlaceholder')}"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
+               color:white;font-size:13px;margin-bottom:16px;text-align:center;">
+      <button id="sg-admin-unlock" style="width:100%;padding:12px;background:#2196f3;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:8px;">
+        ${t('adminPinSubmit')}
+      </button>
+      <button id="sg-admin-cancel" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
+              border:1px solid rgba(168,200,234,0.4);border-radius:8px;margin-bottom:8px;">${t('cancelBtn')}</button>
+      <p id="sg-admin-status" style="color:#a8c8ea;font-size:12px;text-align:center;margin:0;"></p>
+    `, false);
+
+    document.getElementById('sg-admin-unlock').onclick = () => {
+      const pin = document.getElementById('sg-admin-pin').value;
+      const statusEl = document.getElementById('sg-admin-status');
+      const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+
+      statusEl.textContent = 'Waiting for approval on Discord...';
+      document.getElementById('sg-admin-unlock').disabled = true;
+
+      fetch(`${ADMIN_API_URL}/admin-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, host, pin })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'denied') {
+            statusEl.textContent = t('adminPinWrong');
+            document.getElementById('sg-admin-unlock').disabled = false;
+          } else if (data.status === 'pending') {
+            pollAdminStatus(requestId, modal, statusEl);
+          }
+        })
+        .catch(() => {
+          statusEl.textContent = 'Could not reach the bot. Check your connection.';
+          document.getElementById('sg-admin-unlock').disabled = false;
+        });
+    };
+    document.getElementById('sg-admin-cancel').onclick = () => modal.remove();
+  }
+
   function ensureFabButton() {
     if (document.getElementById('sg-fab-btn')) return;
     const fab = document.createElement('div');
@@ -725,6 +1066,19 @@
     `;
     fab.onclick = openReportModal;
     document.documentElement.appendChild(fab);
+
+    const gear = document.createElement('div');
+    gear.id = 'sg-admin-gear';
+    gear.innerHTML = '⚙️';
+    gear.title = 'Admin';
+    gear.style.cssText = `
+      position:fixed;bottom:20px;right:76px;width:36px;height:36px;
+      background:rgba(50,50,50,0.6);border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:16px;cursor:pointer;z-index:999998;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.55;
+    `;
+    gear.onclick = openAdminGate;
+    document.documentElement.appendChild(gear);
   }
 
   // ---- Disclaimer screen shown when user taps "Continue anyway" ----
@@ -864,9 +1218,12 @@
       window.addEventListener('DOMContentLoaded', showUserIdPrompt);
     }
   } else {
+    maybeSendWeeklyStats();
+
     const instantResult = instantCheck();
     if (instantResult.detectedCategory) {
       alreadyRendered = true;
+      bumpStat('sg_stats_detections');
       renderUI(instantResult.detectedCategory, instantResult.flags, false);
     }
 
@@ -893,13 +1250,14 @@
 
       if (detectedCategory) {
         alreadyRendered = true;
+        bumpStat('sg_stats_detections');
         renderUI(detectedCategory, flags, false);
       } else if (isUnknown) {
         renderUI(null, [], true);
       } else {
         ensureFabButton();
       }
-     };
+    };
 
     loadHostsList(adultListUrl, ADULT_CACHE_KEY, ADULT_CACHE_TIME_KEY, (set) => {
       adultSetResult = set;
