@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      8.0
+// @version      8.2
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -132,7 +132,7 @@
   //  ADMIN PANEL — now verified by your Discord bot, not this script.
   //  Paste the URL where your scamguard-bot is hosted (Bot-Hosting.net).
   // ============================================
-  const ADMIN_API_URL = 'http://fi5.bot-hosting.net:21119'; // e.g. https://your-bot.bot-hosting.net
+  const ADMIN_API_URL = 'http://fi5.bot-hosting.net:21119';
 
   // Webhook that logs every domain you add via the Admin Panel,
   // so you remember to copy it into the GitHub source lists later.
@@ -891,6 +891,15 @@
     document.getElementById('sg-unk-dismiss').onclick = () => banner.remove();
   }
 
+  function syncDomainToGithub(category, domain) {
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) return;
+    fetch(`${ADMIN_API_URL}/admin-add-domain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, domain })
+    }).catch(() => {});
+  }
+
   function sendAdminLog(category, domain) {
     if (!adminWebhookUrl || adminWebhookUrl.includes('PASTE_YOUR')) return;
     fetch(adminWebhookUrl, {
@@ -950,6 +959,7 @@
       if (!domain) return;
       addAdminDomain(cat, domain);
       sendAdminLog(cat, domain);
+      syncDomainToGithub(cat, domain);
       alert(t('adminAdded'));
       document.getElementById('sg-admin-domain').value = '';
     };
@@ -966,6 +976,7 @@
           .filter(Boolean);
         lines.forEach(d => addAdminDomain(cat, d));
         sendAdminLog(cat, `(bulk import: ${lines.length} domains)`);
+        syncBulkToGithub(cat, lines);
         alert(t('adminImported', { count: lines.length }));
       };
       reader.readAsText(file);
@@ -1064,21 +1075,28 @@
       justify-content:center;font-size:22px;cursor:pointer;z-index:999998;
       box-shadow:0 4px 12px rgba(0,0,0,0.3);
     `;
-    fab.onclick = openReportModal;
-    document.documentElement.appendChild(fab);
 
-    const gear = document.createElement('div');
-    gear.id = 'sg-admin-gear';
-    gear.innerHTML = '⚙️';
-    gear.title = 'Admin';
-    gear.style.cssText = `
-      position:fixed;bottom:20px;right:76px;width:36px;height:36px;
-      background:rgba(50,50,50,0.6);border-radius:50%;display:flex;align-items:center;
-      justify-content:center;font-size:16px;cursor:pointer;z-index:999998;
-      box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.55;
-    `;
-    gear.onclick = openAdminGate;
-    document.documentElement.appendChild(gear);
+    // Tap the report button 5 times quickly to open the hidden Admin Panel
+    // instead of a visible gear icon (harder for casual users to notice/try).
+    const ADMIN_TAP_THRESHOLD = 5;
+    const ADMIN_TAP_WINDOW_MS = 500;
+    let fabTapCount = 0;
+    let fabTapTimer = null;
+
+    fab.onclick = () => {
+      fabTapCount++;
+      clearTimeout(fabTapTimer);
+      fabTapTimer = setTimeout(() => {
+        if (fabTapCount >= ADMIN_TAP_THRESHOLD) {
+          openAdminGate();
+        } else {
+          openReportModal();
+        }
+        fabTapCount = 0;
+      }, ADMIN_TAP_WINDOW_MS);
+    };
+
+    document.documentElement.appendChild(fab);
   }
 
   // ---- Disclaimer screen shown when user taps "Continue anyway" ----
