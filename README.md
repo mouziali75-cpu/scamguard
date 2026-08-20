@@ -1,6 +1,6 @@
 # 🛡️ ScamGuard Lite
 
-![Version](https://img.shields.io/badge/version-8.2-blue)
+![Version](https://img.shields.io/badge/version-9.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Made with](https://img.shields.io/badge/made%20with-JavaScript-yellow)
 [![YouTube Subscribers](https://img.shields.io/youtube/channel/subscribers/UCf_o8wg-WMn2O080LQA1CZg)](https://www.youtube.com/channel/UCf_o8wg-WMn2O080LQA1CZg)
