@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      9.0
+// @version      9.1
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -103,6 +103,14 @@
   //  Leave empty '' to use the warning emoji instead
   // ============================================
   const disclaimerImageUrl = 'https://i.postimg.cc/W4WVbq2L/Photoroom-20260723-124401.png';
+
+  // ============================================
+  //  FLOATING BUTTON ICONS (optional images)
+  //  Leave empty '' to keep using the emoji icons.
+  // ============================================
+  const reportIconUrl = '';      // replaces 🚩
+  const refreshIconUrl = '';     // replaces 🔄
+  const refreshLoadingIconUrl = ''; // replaces ⏳ (shown while refreshing)
 
   // ============================================
   //  SUPPORT / DONATION LINK
@@ -1182,11 +1190,16 @@
     document.getElementById('sg-admin-cancel').onclick = () => modal.remove();
   }
 
+  function iconHtml(imageUrl, fallbackEmoji, sizePx) {
+    if (!imageUrl) return fallbackEmoji;
+    return `<img src="${imageUrl}" onerror="this.outerHTML='${fallbackEmoji}'" style="width:${sizePx}px;height:${sizePx}px;object-fit:contain;">`;
+  }
+
   function ensureFabButton() {
     if (document.getElementById('sg-fab-btn')) return;
     const fab = document.createElement('div');
     fab.id = 'sg-fab-btn';
-    fab.innerHTML = '🚩';
+    fab.innerHTML = iconHtml(reportIconUrl, '🚩', 24);
     fab.title = 'Report a site';
     fab.style.cssText = `
       position:fixed;bottom:20px;right:20px;width:48px;height:48px;
@@ -1224,7 +1237,7 @@
 
     const refreshBtn = document.createElement('div');
     refreshBtn.id = 'sg-refresh-btn';
-    refreshBtn.innerHTML = '🔄';
+    refreshBtn.innerHTML = iconHtml(refreshIconUrl, '🔄', 18);
     refreshBtn.title = t('refreshTooltip');
     refreshBtn.style.cssText = `
       position:fixed;bottom:20px;left:20px;width:40px;height:40px;
@@ -1233,14 +1246,14 @@
       box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.7;
     `;
     refreshBtn.onclick = () => {
-      refreshBtn.innerHTML = '⏳';
+      refreshBtn.innerHTML = iconHtml(refreshLoadingIconUrl, '⏳', 18);
       refreshListsFromGithub()
         .then(counts => {
-          refreshBtn.innerHTML = '🔄';
+          refreshBtn.innerHTML = iconHtml(refreshIconUrl, '🔄', 18);
           alert(t('refreshDone', counts));
         })
         .catch(() => {
-          refreshBtn.innerHTML = '🔄';
+          refreshBtn.innerHTML = iconHtml(refreshIconUrl, '🔄', 18);
           alert(t('refreshFailed'));
         });
     };
