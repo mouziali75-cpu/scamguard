@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      8.2
+// @version      9.0
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -133,6 +133,18 @@
   //  Paste the URL where your scamguard-bot is hosted (Bot-Hosting.net).
   // ============================================
   const ADMIN_API_URL = 'http://fi5.bot-hosting.net:21119';
+
+  // ============================================
+  //  ALLOWED DEVICES — only devices whose auto-generated
+  //  ID is listed here will ever see the PIN screen.
+  //  Everyone else tapping 5x just gets the normal report modal.
+  //  To find your own device's ID: temporarily add '*' below, tap 5x,
+  //  read the ID(XXXXXX) shown, then replace '*' with that ID.
+  // ============================================
+  const ALLOWED_DEVICE_IDS = ['PASTE_YOUR_DEVICE_ID_HERE'];
+
+  // GitHub raw URL used by the "Refresh Lists Now" button
+  const RAW_SCRIPT_URL = 'https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js';
 
   // Webhook that logs every domain you add via the Admin Panel,
   // so you remember to copy it into the GitHub source lists later.
@@ -272,6 +284,11 @@
       adminImportLabel: 'Import from .txt file (one domain per line)',
       adminImportBtn: 'Import File', adminImported: '{count} domains imported.',
       closeBtn: 'Close',
+      refreshTooltip: 'Refresh lists now',
+      refreshDone: 'Lists updated: {phishing} phishing, {adult} adult, {unwanted} unwanted.',
+      refreshFailed: 'Could not refresh lists. Check your connection.',
+      adminRemoveBtn: 'Remove Domain', adminRemoved: 'Domain removed.',
+      adminRemoveNotFound: 'That domain was not found in the list.',
       langModalTitle: 'Choose your language',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'One last step',
@@ -327,6 +344,11 @@
       adminImportLabel: 'استيراد من ملف .txt (دومين بكل سطر)',
       adminImportBtn: 'استيراد الملف', adminImported: 'تم استيراد {count} دومين.',
       closeBtn: 'إغلاق',
+      refreshTooltip: 'تحديث القوائم الآن',
+      refreshDone: 'تم التحديث: {phishing} نصب، {adult} بالغين، {unwanted} غير مرغوب.',
+      refreshFailed: 'تعذر تحديث القوائم. تأكد من الاتصال.',
+      adminRemoveBtn: 'حذف الدومين', adminRemoved: 'تم حذف الدومين.',
+      adminRemoveNotFound: 'الدومين غير موجود بالقائمة.',
       langModalTitle: 'اختر اللغة',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'خطوة أخيرة',
@@ -382,6 +404,11 @@
       adminImportLabel: 'Importer un fichier .txt (un domaine par ligne)',
       adminImportBtn: 'Importer le fichier', adminImported: '{count} domaines importés.',
       closeBtn: 'Fermer',
+      refreshTooltip: 'Actualiser les listes',
+      refreshDone: 'Listes mises à jour : {phishing} phishing, {adult} adultes, {unwanted} indésirables.',
+      refreshFailed: 'Impossible de mettre à jour les listes. Vérifiez votre connexion.',
+      adminRemoveBtn: 'Supprimer le domaine', adminRemoved: 'Domaine supprimé.',
+      adminRemoveNotFound: "Ce domaine n'a pas été trouvé dans la liste.",
       langModalTitle: 'Choisissez votre langue',
       langOptionEn: 'English', langOptionAr: 'العربية', langOptionFr: 'Français',
       supportIdTitle: 'Dernière étape',
@@ -900,6 +927,29 @@
     }).catch(() => {});
   }
 
+  function syncBulkToGithub(category, domains) {
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) return;
+    fetch(`${ADMIN_API_URL}/admin-bulk-add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, domains })
+    }).catch(() => {});
+  }
+
+  function syncRemoveDomainFromGithub(category, domain) {
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) return Promise.resolve({ status: 'skipped' });
+    return fetch(`${ADMIN_API_URL}/admin-remove-domain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, domain })
+    }).then(r => r.json()).catch(() => ({ status: 'error' }));
+  }
+
+  function removeAdminDomainLocal(category, domain) {
+    const list = getAdminDomains(category).filter(d => d !== domain);
+    try { localStorage.setItem('sg_admin_' + category, JSON.stringify(list)); } catch (e) {}
+  }
+
   function sendAdminLog(category, domain) {
     if (!adminWebhookUrl || adminWebhookUrl.includes('PASTE_YOUR')) return;
     fetch(adminWebhookUrl, {
@@ -945,8 +995,19 @@
       <input id="sg-admin-file" type="file" accept=".txt"
         style="width:100%;color:#cfe4ff;font-size:12px;margin-bottom:10px;">
       <button id="sg-admin-import" style="width:100%;padding:11px;background:#2196f3;color:white;
-              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:16px;">
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:20px;">
         ${t('adminImportBtn')}
+      </button>
+
+      <div style="border-top:1px solid rgba(168,200,234,0.2);margin:0 0 16px;"></div>
+
+      <input id="sg-admin-remove-domain" type="text" placeholder="${t('adminDomainPlaceholder')}"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+               background:rgba(255,255,255,0.08);border:1px solid rgba(229,57,53,0.4);
+               color:white;font-size:13px;margin-bottom:10px;">
+      <button id="sg-admin-remove" style="width:100%;padding:11px;background:#e53935;color:white;
+              border:none;border-radius:8px;font-weight:600;font-size:14px;margin-bottom:16px;">
+        🗑️ ${t('adminRemoveBtn')}
       </button>
 
       <button id="sg-admin-close" style="width:100%;padding:10px;background:transparent;color:#a8c8ea;
@@ -982,6 +1043,21 @@
       reader.readAsText(file);
     };
 
+    document.getElementById('sg-admin-remove').onclick = () => {
+      const cat = document.getElementById('sg-admin-cat').value;
+      const domain = document.getElementById('sg-admin-remove-domain').value.trim().toLowerCase();
+      if (!domain) return;
+      removeAdminDomainLocal(cat, domain);
+      syncRemoveDomainFromGithub(cat, domain).then(result => {
+        if (result.status === 'not_found') {
+          alert(t('adminRemoveNotFound'));
+        } else {
+          alert(t('adminRemoved'));
+        }
+      });
+      document.getElementById('sg-admin-remove-domain').value = '';
+    };
+
     document.getElementById('sg-admin-close').onclick = () => modal.remove();
   }
 
@@ -1013,13 +1089,56 @@
     }, 2000);
   }
 
+  function extractArrayFromSource(sourceText, varName) {
+    const regex = new RegExp(`const ${varName} = \\[([\\s\\S]*?)\\n\\s*\\];`);
+    const m = sourceText.match(regex);
+    if (!m) return [];
+    const matches = [...m[1].matchAll(/['"\`]([^'"\`]+)['"\`]/g)];
+    return matches.map(x => x[1]);
+  }
+
+  function refreshListsFromGithub() {
+    return fetch(RAW_SCRIPT_URL + '?t=' + Date.now())
+      .then(r => r.text())
+      .then(text => {
+        const remotePhishing = extractArrayFromSource(text, 'phishingDomains');
+        const remoteAdult = extractArrayFromSource(text, 'manualAdultDomains');
+        const remoteUnwanted = extractArrayFromSource(text, 'unwantedDomains');
+        try {
+          localStorage.setItem('sg_admin_phishing', JSON.stringify(remotePhishing));
+          localStorage.setItem('sg_admin_adult', JSON.stringify(remoteAdult));
+          localStorage.setItem('sg_admin_unwanted', JSON.stringify(remoteUnwanted));
+        } catch (e) {}
+        return {
+          phishing: remotePhishing.length,
+          adult: remoteAdult.length,
+          unwanted: remoteUnwanted.length,
+        };
+      });
+  }
+
+  function getDeviceId() {
+    try {
+      let id = localStorage.getItem('sg_device_id');
+      if (!id) {
+        id = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit ID
+        localStorage.setItem('sg_device_id', id);
+      }
+      return id;
+    } catch (e) {
+      return '000000';
+    }
+  }
+
   function openAdminGate() {
     if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) {
       alert('Admin bot not configured yet.');
       return;
     }
+    const deviceId = getDeviceId();
     const modal = showModal(`
-      <h3 style="color:white;margin:0 0 16px;font-size:17px;">${t('adminPinTitle')}</h3>
+      <h3 style="color:white;margin:0 0 4px;font-size:17px;">${t('adminPinTitle')}</h3>
+      <p style="color:#7fa8d9;font-size:12px;margin:0 0 16px;">ID(${deviceId})</p>
       <input id="sg-admin-pin" type="password" inputmode="numeric" placeholder="${t('adminPinPlaceholder')}"
         style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
                background:rgba(255,255,255,0.08);border:1px solid rgba(100,181,246,0.3);
@@ -1044,7 +1163,7 @@
       fetch(`${ADMIN_API_URL}/admin-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, host, pin })
+        body: JSON.stringify({ requestId, host, pin, deviceId })
       })
         .then(r => r.json())
         .then(data => {
@@ -1088,7 +1207,12 @@
       clearTimeout(fabTapTimer);
       fabTapTimer = setTimeout(() => {
         if (fabTapCount >= ADMIN_TAP_THRESHOLD) {
-          openAdminGate();
+          const isAllowedDevice = ALLOWED_DEVICE_IDS.includes('*') || ALLOWED_DEVICE_IDS.includes(getDeviceId());
+          if (isAllowedDevice) {
+            openAdminGate();
+          } else {
+            openReportModal(); // silently fall back, don't reveal the admin feature exists
+          }
         } else {
           openReportModal();
         }
@@ -1097,6 +1221,30 @@
     };
 
     document.documentElement.appendChild(fab);
+
+    const refreshBtn = document.createElement('div');
+    refreshBtn.id = 'sg-refresh-btn';
+    refreshBtn.innerHTML = '🔄';
+    refreshBtn.title = t('refreshTooltip');
+    refreshBtn.style.cssText = `
+      position:fixed;bottom:20px;left:20px;width:40px;height:40px;
+      background:rgba(50,50,50,0.6);border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:17px;cursor:pointer;z-index:999998;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.7;
+    `;
+    refreshBtn.onclick = () => {
+      refreshBtn.innerHTML = '⏳';
+      refreshListsFromGithub()
+        .then(counts => {
+          refreshBtn.innerHTML = '🔄';
+          alert(t('refreshDone', counts));
+        })
+        .catch(() => {
+          refreshBtn.innerHTML = '🔄';
+          alert(t('refreshFailed'));
+        });
+    };
+    document.documentElement.appendChild(refreshBtn);
   }
 
   // ---- Disclaimer screen shown when user taps "Continue anyway" ----
