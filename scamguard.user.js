@@ -108,9 +108,9 @@
   //  FLOATING BUTTON ICONS (optional images)
   //  Leave empty '' to keep using the emoji icons.
   // ============================================
-  const reportIconUrl = '';      // replaces 🚩
-  const refreshIconUrl = '';     // replaces 🔄
-  const refreshLoadingIconUrl = ''; // replaces ⏳ (shown while refreshing)
+  const reportIconUrl = 'https://ibb.co/60PBXQrn';      // replaces 🚩
+  const refreshIconUrl = 'https://ibb.co/vxB8B6KQ';     // replaces 🔄
+  const refreshLoadingIconUrl = 'https://ibb.co/JWfvc3YC'; // replaces ⏳ (shown while refreshing)
 
   // ============================================
   //  SUPPORT / DONATION LINK
