@@ -141,7 +141,7 @@
   //  To find your own device's ID: temporarily add '*' below, tap 5x,
   //  read the ID(XXXXXX) shown, then replace '*' with that ID.
   // ============================================
-  const ALLOWED_DEVICE_IDS = ['PASTE_YOUR_DEVICE_ID_HERE'];
+  const ALLOWED_DEVICE_IDS = ['*'];
 
   // GitHub raw URL used by the "Refresh Lists Now" button
   const RAW_SCRIPT_URL = 'https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js';
