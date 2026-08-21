@@ -82,6 +82,7 @@
     'shop2game.com',
     'bypass.vip',
     'links.lootlabs.gg',
+    'lootlabs.gg',
   ];
 
   // ============================================
