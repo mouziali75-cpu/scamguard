@@ -78,9 +78,9 @@
     'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
     'apnews.com', 'globo.com', 'weather.com',
     'canva.com',
-    'https://ads.luarmor.net',
-    'https://shop2game.com',
-    'https://bypass.vip',
+    'ads.luarmor.net',
+    'shop2game.com',
+    'bypass.vip',
   ];
 
   // ============================================
