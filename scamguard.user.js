@@ -79,6 +79,7 @@
     'apnews.com', 'globo.com', 'weather.com',
     'canva.com',
     'https://ads.luarmor.net',
+    'https://shop2game.com',
   ];
 
   // ============================================
