@@ -80,6 +80,7 @@
     'canva.com',
     'https://ads.luarmor.net',
     'https://shop2game.com',
+    'https://bypass.vip',
   ];
 
   // ============================================
