@@ -78,6 +78,7 @@
     'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
     'apnews.com', 'globo.com', 'weather.com',
     'canva.com',
+    'https://ads.luarmor.net',
   ];
 
   // ============================================
