@@ -110,7 +110,7 @@
   // ============================================
   const reportIconUrl = 'https://i.ibb.co/KzfgZdWy/images-3-1.jpg';      // replaces 🚩
   const refreshIconUrl = 'https://i.ibb.co/p6zBpy9K/5278646.png';     // replaces 🔄
-  const refreshLoadingIconUrl = 'https://i.ibb.co/YFg04brk/update.gif'; // replaces ⏳ (shown while refreshing)
+  const refreshLoadingIconUrl = 'https://i.ibb.co/p6zBpy9K/5278646.png'; // replaces ⏳ (shown while refreshing)
 
   // ============================================
   //  SUPPORT / DONATION LINK
