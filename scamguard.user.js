@@ -81,6 +81,7 @@
     'ads.luarmor.net',
     'shop2game.com',
     'bypass.vip',
+    'links.lootlabs.gg',
   ];
 
   // ============================================
