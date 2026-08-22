@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ScamGuard Lite
 // @namespace    https://viayoo.com/
-// @version      9.2
+// @version      10.0
 // @description  Multi-category site detector (manual + online lists) with multilingual UI
 // @author       You
 // @match        *://*/*
@@ -78,11 +78,6 @@
     'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'reuters.com',
     'apnews.com', 'globo.com', 'weather.com',
     'canva.com',
-    'ads.luarmor.net',
-    'shop2game.com',
-    'bypass.vip',
-    'links.lootlabs.gg',
-    'lootlabs.gg',
   ];
 
   // ============================================
@@ -113,9 +108,9 @@
   //  FLOATING BUTTON ICONS (optional images)
   //  Leave empty '' to keep using the emoji icons.
   // ============================================
-  const reportIconUrl = 'https://i.ibb.co/mrtwzDqn/file-00000000b9d881f48bb2e13386c6075e.png';      // replaces 🚩
+  const reportIconUrl = 'https://i.ibb.co/KzfgZdWy/images-3-1.jpg';      // replaces 🚩
   const refreshIconUrl = 'https://i.ibb.co/p6zBpy9K/5278646.png';     // replaces 🔄
-  const refreshLoadingIconUrl = 'https://i.ibb.co/p6zBpy9K/5278646.png'; // replaces ⏳ (shown while refreshing)
+  const refreshLoadingIconUrl = 'https://i.ibb.co/YFg04brk/update.gif'; // replaces ⏳ (shown while refreshing)
 
   // ============================================
   //  SUPPORT / DONATION LINK
@@ -124,9 +119,12 @@
   const SUPPORT_LINK_URL = 'https://sub4unlock.com/S/r4bgr';
 
   // ============================================
-  //  DISCORD WEBHOOK URL
+  //  DISCORD MESSAGING — routed entirely through your private bot now
+  //  (ADMIN_API_URL below), never through webhook URLs in this public
+  //  script. Webhook URLs written here would be visible to anyone who
+  //  reads the raw file on GitHub and could be used to spam your
+  //  channels — that is what happened before this version.
   // ============================================
-  const webhookUrl = 'https://discord.com/api/webhooks/1529255203595878430/Sfl-UVmfYYbbQZJtwQvR0Tf272gpEAKHJ1Jz4PAXFVUf8aq7UcBXKjVjq2FVURPJUDXv';
 
   // ============================================
   //  LAST LINK — the destination page shown after completing your
@@ -134,12 +132,6 @@
   //  ScamGuard shows a screen asking for their Discord User ID.
   // ============================================
   const LAST_LINK_URL = 'https://i.postimg.cc/c1TqBnqW/images-(1).jpg';
-
-  // ============================================
-  //  USER ID WEBHOOK — separate webhook that only receives submitted
-  //  Discord User IDs from the "last link" screen above.
-  // ============================================
-  const userIdWebhookUrl = 'https://discord.com/api/webhooks/1529810880173314061/BozXvpkS3N0EDW3Sce0JzXjz5mGyrqZZoQ-0t2qZecua1r9xD2P5EU6nGtiga1sg35sZ';
 
   // ============================================
   //  ADMIN PANEL — now verified by your Discord bot, not this script.
@@ -158,14 +150,6 @@
 
   // GitHub raw URL used by the "Refresh Lists Now" button
   const RAW_SCRIPT_URL = 'https://raw.githubusercontent.com/mouziali75-cpu/scamguard/main/scamguard.user.js';
-
-  // Webhook that logs every domain you add via the Admin Panel,
-  // so you remember to copy it into the GitHub source lists later.
-  const adminWebhookUrl = 'https://discord.com/api/webhooks/1530337337735643378/wOVbDO6Pvio4k3_H1PMkoxr1PmPZgzCf1Lo43d8dHdowCsuQ7knrZbZtr03BLVjwyM0f';
-
-  // Optional: sends a usage summary to this webhook roughly every 7 days
-  // (based on this device's local activity only — not global stats).
-  const statsWebhookUrl = 'https://discord.com/api/webhooks/1530337590488858804/54TfO9qLEKslu-F_TtXeWyxsKvgnYHWbFAvPz509NVywlw9lbqmmtWuxnqG2y5VYx9bL';
 
   // ============================================
   //  DANGEROUS FILE EXTENSIONS — flags links pointing to risky downloads
@@ -582,7 +566,7 @@
         detectedCategory = detectedCategory || 'phishing';
         flags.push({ key: 'flagBrand', params: { brand } });
       }
-    });
+    }});
     if (!isTrustedGlobal) {
       const lookAlikeBrand = checkLookAlike(host);
       if (lookAlikeBrand) {
@@ -618,7 +602,7 @@
   }
 
   function maybeSendWeeklyStats() {
-    if (!statsWebhookUrl || statsWebhookUrl.includes('PASTE_YOUR')) return;
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) return;
     try {
       const lastPost = parseInt(localStorage.getItem('sg_stats_last_post') || '0');
       const weekMs = 1000 * 60 * 60 * 24 * 7;
@@ -627,20 +611,10 @@
       const detections = parseInt(localStorage.getItem('sg_stats_detections') || '0');
       const reports = parseInt(localStorage.getItem('sg_stats_reports') || '0');
 
-      fetch(statsWebhookUrl, {
+      fetch(`${ADMIN_API_URL}/weekly-stats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          embeds: [{
-            title: '📊 Weekly ScamGuard Stats (this device)',
-            color: 3901635,
-            fields: [
-              { name: 'Sites detected', value: String(detections), inline: true },
-              { name: 'Reports submitted', value: String(reports), inline: true }
-            ],
-            timestamp: new Date().toISOString()
-          }]
-        })
+        body: JSON.stringify({ detections, reports })
       }).catch(() => {});
 
       localStorage.setItem('sg_stats_detections', '0');
@@ -666,61 +640,30 @@
   let alreadyRendered = false;
 
   function sendReport(url, category, note, discordId) {
-    if (!webhookUrl || webhookUrl.includes('PASTE_YOUR')) {
-      alert('Webhook not configured yet.');
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) {
+      alert('Bot not configured yet.');
       return;
     }
-    const colorMap = { phishing: 2201331, adult: 15158332, unwanted: 16098851, safe: 5025616 };
-    const catLabelMapEn = {
-      phishing: '🛡️ Phishing / Scam',
-      adult: '🔞 Adult Content',
-      unwanted: '⚠️ Unwanted / Spam',
-      safe: '✅ Well-known / Safe Site'
-    };
-    const fields = [
-      { name: 'Category', value: catLabelMapEn[category] },
-      { name: 'URL / Domain', value: url },
-      { name: 'Description', value: note || 'No description provided' }
-    ];
-    if (discordId) {
-      const reportCount = bumpReportCountForId(discordId);
-      let reporterLine = `<@${discordId}>`;
-      if (reportCount >= 3) reporterLine += `  🌟 Trusted Reporter (${reportCount} reports)`;
-      fields.push({ name: 'Reported by', value: reporterLine });
-    }
+    let reporterCount = 0;
+    if (discordId) reporterCount = bumpReportCountForId(discordId);
     bumpStat('sg_stats_reports');
-    fetch(webhookUrl, {
+    fetch(`${ADMIN_API_URL}/report-site`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title: category === 'safe' ? '✅ Suggested Trusted Domain' : '🚩 New Site Report',
-          color: colorMap[category] || 15158332,
-          fields: fields,
-          timestamp: new Date().toISOString()
-        }]
-      })
+      body: JSON.stringify({ category, url, description: note, discordId, reporterCount })
     }).then(() => alert('Report sent, thank you!'))
       .catch(() => alert('Failed to send report.'));
   }
 
   function sendUserId(discordId) {
-    if (!userIdWebhookUrl || userIdWebhookUrl.includes('PASTE_YOUR')) {
-      alert('User ID webhook not configured yet.');
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) {
+      alert('Bot not configured yet.');
       return Promise.reject();
     }
-    return fetch(userIdWebhookUrl, {
+    return fetch(`${ADMIN_API_URL}/submit-task-id`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title: '✅ تم اتمام المهام من قبل',
-          description: `<@${discordId}>`,
-          color: 5025616,
-          footer: { text: `User ID: ${discordId}` },
-          timestamp: new Date().toISOString()
-        }]
-      })
+      body: JSON.stringify({ discordId })
     });
   }
 
@@ -964,21 +907,11 @@
   }
 
   function sendAdminLog(category, domain) {
-    if (!adminWebhookUrl || adminWebhookUrl.includes('PASTE_YOUR')) return;
-    fetch(adminWebhookUrl, {
+    if (!ADMIN_API_URL || ADMIN_API_URL.includes('PASTE_YOUR')) return;
+    fetch(`${ADMIN_API_URL}/admin-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title: '🛠️ Admin Domain Added',
-          color: 10181046,
-          fields: [
-            { name: 'Category', value: category },
-            { name: 'Domain', value: domain }
-          ],
-          timestamp: new Date().toISOString()
-        }]
-      })
+      body: JSON.stringify({ category, domain })
     }).catch(() => {});
   }
 
@@ -1219,7 +1152,7 @@
     // Tap the report button 5 times quickly to open the hidden Admin Panel
     // instead of a visible gear icon (harder for casual users to notice/try).
     const ADMIN_TAP_THRESHOLD = 5;
-    const ADMIN_TAP_WINDOW_MS = 500;
+    const ADMIN_TAP_WINDOW_MS = 800;
     let fabTapCount = 0;
     let fabTapTimer = null;
 
