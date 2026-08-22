@@ -566,7 +566,7 @@
         detectedCategory = detectedCategory || 'phishing';
         flags.push({ key: 'flagBrand', params: { brand } });
       }
-    }});
+    });
     if (!isTrustedGlobal) {
       const lookAlikeBrand = checkLookAlike(host);
       if (lookAlikeBrand) {
