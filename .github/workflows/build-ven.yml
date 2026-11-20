@@ -67,8 +67,8 @@ jobs:
                   applicationId 'app.ven.browser'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 2
+                  versionName '1.1'
               }
 
               compileOptions {
@@ -202,11 +202,22 @@ jobs:
           public class MainActivity extends Activity {
 
               static final String SUPPORT_URL = "https://discord.gg/kz4mpxw4Ga";
-              static final String VERSION = "1.0";
+              static final String VERSION = "1.1";
+              static final String OWNER_URL = "https://ticoo.wispbyte.org/ven/owner";
               static final int C_BG = 0xFF0F1117, C_BAR = 0xFF171A23, C_PILL = 0xFF252A38, C_TEXT = 0xFFE8EAF0,
                       C_MUTED = 0xFF8D95AA, C_ACCENT = 0xFF4F8CFF, C_OK = 0xFF3DDC84, C_WARN = 0xFFFFB020,
                       C_BAD = 0xFFE5484D, C_SHEET = 0xFF1B1F2B, C_LINE = 0xFF2A3042;
               static final String DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+              // In desktop mode the page must lay out as a wide page even if it asks for a mobile viewport (like Chrome does)
+              static final String DESKTOP_JS = "(function(){try{if(window.__vdk)return;window.__vdk=1;"
+                      + "var q=0;function fix(){q=0;var h=document.head||document.documentElement;if(!h)return;"
+                      + "var m=document.querySelector('meta[name=viewport]');"
+                      + "if(!m){m=document.createElement('meta');m.name='viewport';h.appendChild(m);}"
+                      + "if(m.getAttribute('content')!=='width=1100')m.setAttribute('content','width=1100');}"
+                      + "function sch(){if(!q){q=1;setTimeout(fix,30);}}"
+                      + "fix();new MutationObserver(sch).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});"
+                      + "}catch(e){}})();";
 
               static final String AD_JS = "(function(){if(window.__sgAd)return;window.__sgAd=1;"
                       + "var s=document.createElement('style');s.textContent='"
@@ -282,6 +293,7 @@ jobs:
                       @Override public void run() {
                           Shield.loadCache(MainActivity.this);
                           if (Shield.cacheStale(MainActivity.this)) Shield.refresh(MainActivity.this);
+                          else Shield.refreshOwner(MainActivity.this);   // the owner lists are tiny: refresh them at every start
                       }
                   }).start();
                   restoreTabs(getIntent());
@@ -652,6 +664,7 @@ jobs:
                       closeTab(old);
                   }
                   Tab t = new Tab();
+                  t.desktop = prefs.getBoolean("def_desktop", false);
                   t.web = makeWebView(t);
                   t.web.setVisibility(View.GONE);
                   webHolder.addView(t.web, new FrameLayout.LayoutParams(-1, -1));
@@ -978,6 +991,11 @@ jobs:
                       }
 
                       @Override
+                      public void onPageCommitVisible(WebView v, String url) {
+                          if (t.desktop && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(DESKTOP_JS, null);
+                      }
+
+                      @Override
                       public void onPageFinished(WebView v, String url) {
                           t.progress = 100;
                           t.skipUpgrade = false;
@@ -986,6 +1004,7 @@ jobs:
                           if (t == cur) updateUrlBar();
                           if (url == null || url.startsWith(Pages.BASE) || !isWeb(url)) return;
                           addHistory(t.title, url);
+                          if (t.desktop) v.evaluateJavascript(DESKTOP_JS, null);
                           if (sAds) v.evaluateJavascript(AD_JS, null);
                           v.evaluateJavascript(SCAN_JS, new ValueCallback<String>() {
                               @Override public void onReceiveValue(String value) { analyze(t, value); }
@@ -1355,7 +1374,8 @@ jobs:
                           menu.dismiss();
                           cur.desktop = !cur.desktop;
                           applySettings(cur.web, cur);
-                          cur.web.reload();
+                          String ru = realUrl();
+                          if (ru != null) cur.web.loadUrl(ru); else cur.web.reload();   // a fresh request, so the site sees the new user agent
                       }
                   });
                   box.addView(dRow, new LinearLayout.LayoutParams(-1, -2));
@@ -1851,6 +1871,7 @@ jobs:
                   });
 
                   section(p, S.t("set_general"));
+                  switchRow(p, S.t("set_desktop_def"), S.t("set_desktop_def_d"), "def_desktop", false, null);
                   final String[] langCodes = {"en", "ar", "fr"};
                   final String[] langNames = {"English", "العربية", "Français"};
                   String curLang = "English";
@@ -1895,6 +1916,11 @@ jobs:
                                       @Override public void onClick(android.content.DialogInterface di, int w) { clearData(); }
                                   }).show();
                       }
+                  });
+
+                  section(p, S.t("set_owner"));
+                  valueRow(p, S.t("owner_panel"), S.t("owner_panel_d"), new View.OnClickListener() {
+                      @Override public void onClick(View v) { d.dismiss(); newTab(OWNER_URL, true); }
                   });
 
                   section(p, S.t("set_support"));
@@ -1947,6 +1973,13 @@ jobs:
                   return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
               }
 
+              /** An image set by the owner for this emoji, or the emoji itself. */
+              static String ic(String key, String fallback) {
+                  String u = Shield.icon(key);
+                  if (u != null) return "<img class=\"ei\" alt=\"\" src=\"" + esc(u) + "\">";
+                  return esc(fallback);
+              }
+
               static String enc(String s) {
                   try { return URLEncoder.encode(s, "UTF-8"); } catch (Exception e) { return ""; }
               }
@@ -1963,6 +1996,7 @@ jobs:
                           + "h1{font-size:21px;margin:12px 0 8px;color:" + accent + "}"
                           + "p{color:#aab0c0;line-height:1.5;font-size:15px;margin:6px 0}"
                           + ".ico{font-size:54px;text-align:center}"
+                          + ".ei{width:1em;height:1em;object-fit:contain;vertical-align:-0.12em}"
                           + "ul{padding-inline-start:20px;color:#c8cddb;font-size:14px;line-height:1.6}"
                           + ".url{word-break:break-all;background:#0f1117;border-radius:10px;padding:10px;font-size:13px;color:#8d95aa;margin:12px 0}"
                           + ".btn{display:block;text-align:center;text-decoration:none;border-radius:14px;padding:14px;font-size:16px;font-weight:bold;margin-top:12px}"
@@ -1974,7 +2008,7 @@ jobs:
               static String blocked(String url, Shield.Result r, boolean extraRta) {
                   String cat = r.category == null ? "unwanted" : r.category;
                   String accent = cat.equals("adult") ? "#e0568a" : "#e5484d";
-                  String icon = cat.equals("adult") ? "🔞" : "🛡️";
+                  String icon = cat.equals("adult") ? ic("adult", "🔞") : ic("shield", "🛡️");
                   String title = S.t("warn_" + cat);
                   StringBuilder sb = new StringBuilder(head(title, accent));
                   sb.append("<div class=\"card\"><div class=\"ico\">").append(icon).append("</div>");
@@ -1999,7 +2033,7 @@ jobs:
                   String title = ssl ? S.t("ssl_title") : S.t("err_title");
                   String body = ssl ? S.t("ssl_msg") : desc;
                   StringBuilder sb = new StringBuilder(head(title, ssl ? "#e5484d" : "#4f8cff"));
-                  sb.append("<div class=\"card\"><div class=\"ico\">").append(ssl ? "🔒" : "📡").append("</div>");
+                  sb.append("<div class=\"card\"><div class=\"ico\">").append(ssl ? ic("lock", "🔒") : ic("offline", "📡")).append("</div>");
                   sb.append("<h1>").append(esc(title)).append("</h1>");
                   sb.append("<div class=\"url\">").append(esc(url)).append("</div>");
                   sb.append("<p>").append(esc(body)).append("</p>");
@@ -2015,11 +2049,11 @@ jobs:
 
               static String home(int ads, int threats) {
                   String[][] tiles = {
-                          {"Google", "https://www.google.com/", "G"},
-                          {"YouTube", "https://www.youtube.com/", "▶"},
-                          {"Wikipedia", "https://www.wikipedia.org/", "W"},
-                          {"GitHub", "https://github.com/", "⌘"},
-                          {"Discord", "https://discord.gg/kz4mpxw4Ga", "💬"}
+                          {"Google", "https://www.google.com/", ic("tile_google", "G")},
+                          {"YouTube", "https://www.youtube.com/", ic("tile_youtube", "▶")},
+                          {"Wikipedia", "https://www.wikipedia.org/", ic("tile_wikipedia", "W")},
+                          {"GitHub", "https://github.com/", ic("tile_github", "⌘")},
+                          {"Discord", "https://discord.gg/kz4mpxw4Ga", ic("tile_discord", "💬")}
                   };
                   StringBuilder sb = new StringBuilder(head("Ven", "#4f8cff"));
                   sb.append("<style>.logo{font-size:64px;margin-top:30px}.t{font-size:26px;font-weight:bold;margin:6px 0 2px}"
@@ -2030,8 +2064,10 @@ jobs:
                           + ".tile{width:76px;text-align:center;text-decoration:none;color:#c8cddb;font-size:12px}"
                           + ".tile span{display:flex;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;background:#1d212d;"
                           + "align-items:center;justify-content:center;font-size:22px;color:#4f8cff}"
-                          + ".stats{margin-top:34px;color:#6f778c;font-size:13px;text-align:center}</style>");
-                  sb.append("<div class=\"logo\">🛡️</div><div class=\"t\">Ven</div><div class=\"sub\">")
+                          + ".tile span .ei{width:34px;height:34px;border-radius:8px}"
+                          + ".stats .ei{width:1.3em;height:1.3em}</style>");
+                  sb.append("<style>.stats{margin-top:34px;color:#6f778c;font-size:13px;text-align:center}</style>");
+                  sb.append("<div class=\"logo\">").append(ic("logo", "🛡️")).append("</div><div class=\"t\">Ven</div><div class=\"sub\">")
                           .append(esc(S.t("tagline"))).append("</div>");
                   sb.append("<form onsubmit=\"var q=document.getElementById('q').value;if(q){location.href='").append(BASE)
                           .append("search?q='+encodeURIComponent(q);}return false;\">");
@@ -2043,7 +2079,7 @@ jobs:
                   }
                   sb.append("</div>");
                   String st = S.t("stats").replace("{a}", String.valueOf(ads)).replace("{t}", String.valueOf(threats));
-                  sb.append("<div class=\"stats\">🛡️ ").append(esc(st)).append("<br><br>").append(esc(S.t("copyright"))).append("</div>");
+                  sb.append("<div class=\"stats\">").append(ic("shield", "🛡️")).append(" ").append(esc(st)).append("<br><br>").append(esc(S.t("copyright"))).append("</div>");
                   sb.append("</body></html>");
                   return sb.toString();
               }
@@ -2181,6 +2217,11 @@ jobs:
                   p("credits", "Protection lists: StevenBlack/hosts (MIT) and abuse.ch URLhaus (CC0). Web engine: Android System WebView (Chromium).", "قوائم الحماية: StevenBlack/hosts (MIT) و abuse.ch URLhaus (CC0). محرك الويب: Android System WebView (Chromium).", "Listes de protection : StevenBlack/hosts (MIT) et abuse.ch URLhaus (CC0). Moteur web : Android System WebView (Chromium).");
                   p("join_support", "Join the support server", "انضم لسيرفر الدعم", "Rejoindre le serveur d'assistance");
                   p("share_via", "Share via", "مشاركة عبر", "Partager via");
+                  p("set_desktop_def", "Always use desktop site", "استعمال موقع سطح المكتب دائماً", "Toujours la version ordinateur");
+                  p("set_desktop_def_d", "New tabs open in desktop mode", "التبويبات الجديدة تُفتح بوضع سطح المكتب", "Les nouveaux onglets s'ouvrent en mode ordinateur");
+                  p("owner_panel", "Owner panel", "لوحة المالك", "Panneau propriétaire");
+                  p("owner_panel_d", "Log in with Discord to manage the blocked / allowed domains (owner only)", "سجّل الدخول بديسكورد لإدارة النطاقات المحظورة / المسموحة (للمالك فقط)", "Connectez-vous avec Discord pour gérer les domaines bloqués / autorisés (propriétaire uniquement)");
+                  p("set_owner", "Owner", "المالك", "Propriétaire");
                   p("no_page", "No page to use this on", "لا توجد صفحة لاستعمال هذا الخيار", "Aucune page disponible");
               }
           }
@@ -2276,16 +2317,78 @@ jobs:
               private static volatile Set<String> onlineAdult = new HashSet<>();
               private static volatile Set<String> onlinePhish = new HashSet<>();
 
+              // owner lists (managed from the Owner Panel on the Ticoo site, downloaded as owner.json)
+              private static volatile Set<String> oBlock = new HashSet<>();
+              private static volatile Set<String> oAdult = new HashSet<>();
+              private static volatile Set<String> oAds = new HashSet<>();
+              private static volatile Set<String> oTrust = new HashSet<>();
+              // image links that replace the emojis of the app (set in the Owner Panel)
+              private static volatile java.util.Map<String, String> icons = new java.util.HashMap<>();
+              static String icon(String key) { return icons.get(key); }
+              static final String URL_OWNER = "https://ticoo.wispbyte.org/ven/config.json";
+
               private static final String URL_ADS = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts";
               private static final String URL_ADULT = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts";
               private static final String URL_PHISH = "https://urlhaus.abuse.ch/downloads/hostfile/";
 
-              static int totalDomains() { return onlineAds.size() + onlineAdult.size() + onlinePhish.size(); }
+              static int totalDomains() {
+                  return onlineAds.size() + onlineAdult.size() + onlinePhish.size()
+                          + oBlock.size() + oAdult.size() + oAds.size();
+              }
+
+              private static Set<String> jsonSet(org.json.JSONObject o, String key) {
+                  HashSet<String> s = new HashSet<>();
+                  org.json.JSONArray a = o.optJSONArray(key);
+                  if (a == null) return s;
+                  for (int i = 0; i < a.length(); i++) {
+                      String d = a.optString(i, "").trim().toLowerCase();
+                      if (d.indexOf('.') > 0) s.add(d);
+                  }
+                  return s;
+              }
+
+              static void loadOwner(Context c) {
+                  try {
+                      File f = new File(c.getFilesDir(), "owner.json");
+                      if (!f.exists()) return;
+                      StringBuilder sb = new StringBuilder();
+                      BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+                      String line;
+                      while ((line = br.readLine()) != null) sb.append(line);
+                      br.close();
+                      org.json.JSONObject o = new org.json.JSONObject(sb.toString());
+                      oBlock = jsonSet(o, "block");
+                      oAdult = jsonSet(o, "adult");
+                      oAds = jsonSet(o, "ads");
+                      oTrust = jsonSet(o, "trusted");
+                      java.util.HashMap<String, String> ic = new java.util.HashMap<>();
+                      org.json.JSONObject io = o.optJSONObject("icons");
+                      if (io != null) {
+                          java.util.Iterator<String> it = io.keys();
+                          while (it.hasNext()) {
+                              String k = it.next();
+                              String u = io.optString(k, "");
+                              if (u.startsWith("https://")) ic.put(k, u);
+                          }
+                      }
+                      icons = ic;
+                  } catch (Exception e) { /* keep the old lists */ }
+              }
+
+              /** Blocking: downloads the owner lists (a few KB). Returns true on success. */
+              static boolean refreshOwner(Context c) {
+                  if (download(URL_OWNER, new File(c.getFilesDir(), "owner.json"), 200)) {
+                      loadOwner(c);
+                      return true;
+                  }
+                  return false;
+              }
 
               static void loadCache(Context c) {
                   onlineAds = readFile(new File(c.getFilesDir(), "l_ads.txt"));
                   onlineAdult = readFile(new File(c.getFilesDir(), "l_adult.txt"));
                   onlinePhish = readFile(new File(c.getFilesDir(), "l_phish.txt"));
+                  loadOwner(c);
               }
 
               static boolean cacheStale(Context c) {
@@ -2298,12 +2401,15 @@ jobs:
                   boolean ok = download(URL_ADS, new File(c.getFilesDir(), "l_ads.txt"))
                           | download(URL_ADULT, new File(c.getFilesDir(), "l_adult.txt"))
                           | download(URL_PHISH, new File(c.getFilesDir(), "l_phish.txt"));
-                  if (!ok) return -1;
+                  refreshOwner(c);
+                  if (!ok) { loadCache(c); return -1; }
                   loadCache(c);
                   return totalDomains();
               }
 
-              private static boolean download(String url, File dest) {
+              private static boolean download(String url, File dest) { return download(url, dest, 1000); }
+
+              private static boolean download(String url, File dest, int minBytes) {
                   try {
                       HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
                       con.setConnectTimeout(12000);
@@ -2323,7 +2429,7 @@ jobs:
                       }
                       out.close();
                       in.close();
-                      if (total < 1000) { tmp.delete(); return false; }
+                      if (total < minBytes) { tmp.delete(); return false; }
                       if (dest.exists()) dest.delete();
                       return tmp.renameTo(dest);
                   } catch (Exception e) {
@@ -2372,10 +2478,12 @@ jobs:
                   }
               }
 
-              static boolean isTrusted(String host) { return host != null && inArr(TRUSTED, host); }
+              static boolean isTrusted(String host) { return host != null && (inArr(TRUSTED, host) || inSet(oTrust, host)); }
 
               static boolean isAd(String host) {
-                  if (host == null || isTrusted(host)) return false;
+                  if (host == null) return false;
+                  if (inSet(oAds, host)) return true;
+                  if (isTrusted(host)) return false;
                   return inArr(ADS, host) || inSet(onlineAds, host);
               }
 
@@ -2408,6 +2516,15 @@ jobs:
                   if (host == null || host.isEmpty()) return r;
                   host = host.toLowerCase();
                   String url = fullUrl == null ? "" : fullUrl.toLowerCase();
+                  // owner lists win over everything else (the block list even over the trusted list)
+                  if (inSet(oBlock, host)) {
+                      r.hard = true; r.category = "phishing"; r.flags.add(new String[]{"flag_list", ""});
+                      return r;
+                  }
+                  if (nsfwOn && inSet(oAdult, host)) {
+                      r.hard = true; r.category = "adult"; r.flags.add(new String[]{"flag_adult_list", ""});
+                      return r;
+                  }
                   if (isIpOrLocal(host) || isTrusted(host)) return r;
 
                   String[] parts = host.split("\\.");
