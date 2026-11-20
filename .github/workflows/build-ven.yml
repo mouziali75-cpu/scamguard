@@ -289,11 +289,25 @@ jobs:
                   getWindow().setStatusBarColor(C_BAR);
                   getWindow().setNavigationBarColor(C_BG);
                   buildUi();
+                  Shield.loadOwner(this);   // tiny file: the owner lists and icons are ready before the first page
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          if (Shield.refreshOwner(MainActivity.this) && Shield.iconsChanged) {
+                              ui.post(new Runnable() {
+                                  @Override public void run() {
+                                      for (Tab t : tabs) {
+                                          if (t.url != null && t.url.startsWith(Pages.BASE)) t.web.reload();
+                                      }
+                                  }
+                              });
+                          }
+                      }
+                  }).start();
                   new Thread(new Runnable() {
                       @Override public void run() {
                           Shield.loadCache(MainActivity.this);
                           if (Shield.cacheStale(MainActivity.this)) Shield.refresh(MainActivity.this);
-                          else Shield.refreshOwner(MainActivity.this);   // the owner lists are tiny: refresh them at every start
+
                       }
                   }).start();
                   restoreTabs(getIntent());
@@ -2324,7 +2338,29 @@ jobs:
               private static volatile Set<String> oTrust = new HashSet<>();
               // image links that replace the emojis of the app (set in the Owner Panel)
               private static volatile java.util.Map<String, String> icons = new java.util.HashMap<>();
-              static String icon(String key) { return icons.get(key); }
+              private static volatile java.util.Map<String, String> iconData = new java.util.HashMap<>();   // key -> data: URI (from the disk cache)
+              static volatile boolean iconsChanged;
+              /** The image for this emoji: the cached copy (instant) or the link, or null when none is set. */
+              static String icon(String key) {
+                  String d = iconData.get(key);
+                  return d != null ? d : icons.get(key);
+              }
+              private static File iconFile(Context c, String key, String url) {
+                  return new File(c.getFilesDir(), "ic_" + key + "_" + Integer.toHexString(url.hashCode()));
+              }
+              private static String toDataUri(File f) {
+                  try {
+                      if (!f.exists() || f.length() < 50 || f.length() > 400 * 1024) return null;
+                      byte[] b = new byte[(int) f.length()];
+                      FileInputStream in = new FileInputStream(f);
+                      int off = 0, n;
+                      while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+                      in.close();
+                      String mime = (b[0] & 0xFF) == 0x89 ? "image/png" : (b[0] & 0xFF) == 0xFF ? "image/jpeg"
+                              : (b[0] == 'R' && b[1] == 'I') ? "image/webp" : "image/png";
+                      return "data:" + mime + ";base64," + android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP);
+                  } catch (Exception e) { return null; }
+              }
               static final String URL_OWNER = "https://ticoo.wispbyte.org/ven/config.json";
 
               private static final String URL_ADS = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts";
@@ -2372,16 +2408,30 @@ jobs:
                           }
                       }
                       icons = ic;
+                      java.util.HashMap<String, String> dm = new java.util.HashMap<>();
+                      for (java.util.Map.Entry<String, String> e : ic.entrySet()) {
+                          String d = toDataUri(iconFile(c, e.getKey(), e.getValue()));
+                          if (d != null) dm.put(e.getKey(), d);
+                      }
+                      iconData = dm;
                   } catch (Exception e) { /* keep the old lists */ }
               }
 
               /** Blocking: downloads the owner lists (a few KB). Returns true on success. */
               static boolean refreshOwner(Context c) {
-                  if (download(URL_OWNER, new File(c.getFilesDir(), "owner.json"), 200)) {
-                      loadOwner(c);
-                      return true;
+                  if (!download(URL_OWNER, new File(c.getFilesDir(), "owner.json"), 20)) return false;
+                  java.util.Map<String, String> before = new java.util.HashMap<>(icons);
+                  java.util.Map<String, String> beforeData = new java.util.HashMap<>(iconData);
+                  loadOwner(c);
+                  // download the icon images once (they are small) so the next start shows them instantly
+                  boolean fetched = false;
+                  for (java.util.Map.Entry<String, String> e : icons.entrySet()) {
+                      File f = iconFile(c, e.getKey(), e.getValue());
+                      if (!f.exists() && download(e.getValue(), f, 50)) fetched = true;
                   }
-                  return false;
+                  if (fetched) loadOwner(c);
+                  iconsChanged = !before.equals(icons) || !beforeData.keySet().equals(iconData.keySet());
+                  return true;
               }
 
               static void loadCache(Context c) {
