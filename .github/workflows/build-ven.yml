@@ -67,8 +67,8 @@ jobs:
                   applicationId 'app.ven.browser'
                   minSdk 26
                   targetSdk 34
-                  versionCode 2
-                  versionName '1.1'
+                  versionCode 3
+                  versionName '1.2'
               }
 
               compileOptions {
@@ -150,6 +150,9 @@ jobs:
           import android.text.Editable;
           import android.text.Layout;
           import android.text.Spannable;
+          import android.text.SpannableString;
+          import android.text.style.StyleSpan;
+          import android.webkit.WebBackForwardList;
           import android.text.Spanned;
           import android.text.TextWatcher;
           import android.text.style.BackgroundColorSpan;
@@ -202,11 +205,11 @@ jobs:
           public class MainActivity extends Activity {
 
               static final String SUPPORT_URL = "https://discord.gg/kz4mpxw4Ga";
-              static final String VERSION = "1.1";
+              static final String VERSION = "1.2";
               static final String OWNER_URL = "https://ticoo.wispbyte.org/ven/owner";
-              static final int C_BG = 0xFF0F1117, C_BAR = 0xFF171A23, C_PILL = 0xFF252A38, C_TEXT = 0xFFE8EAF0,
-                      C_MUTED = 0xFF8D95AA, C_ACCENT = 0xFF4F8CFF, C_OK = 0xFF3DDC84, C_WARN = 0xFFFFB020,
-                      C_BAD = 0xFFE5484D, C_SHEET = 0xFF1B1F2B, C_LINE = 0xFF2A3042;
+              static final int C_BG = 0xFF0D0B14, C_BAR = 0xFF15121F, C_PILL = 0xFF231E33, C_TEXT = 0xFFE8EAF0,
+                      C_MUTED = 0xFF8D95AA, C_ACCENT = 0xFF7c4dff, C_OK = 0xFF3DDC84, C_WARN = 0xFFFFB020,
+                      C_BAD = 0xFFE5484D, C_SHEET = 0xFF1A1626, C_LINE = 0xFF2B2540;
               static final String DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
               // In desktop mode the page must lay out as a wide page even if it asks for a mobile viewport (like Chrome does)
@@ -217,6 +220,15 @@ jobs:
                       + "if(m.getAttribute('content')!=='width=1100')m.setAttribute('content','width=1100');}"
                       + "function sch(){if(!q){q=1;setTimeout(fix,30);}}"
                       + "fix();new MutationObserver(sch).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});"
+                      + "}catch(e){}})();";
+
+              // "Block payments": no PaymentRequest API, card fields disabled, card forms can't be submitted
+              static final String PAY_JS = "(function(){try{if(window.__vnp)return;window.__vnp=1;"
+                      + "try{Object.defineProperty(window,'PaymentRequest',{value:undefined,configurable:true});}catch(e){}"
+                      + "var sel='input[autocomplete^=\"cc-\"],input[name*=\"cardnumber\" i],input[name*=\"card-number\" i],input[name*=\"card_number\" i],input[id*=\"cardnumber\" i],input[name=\"cvc\" i],input[name=\"cvv\" i]';"
+                      + "function kill(){var l=document.querySelectorAll(sel);for(var i=0;i<l.length;i++){var e=l[i];if(e.__vk)continue;e.__vk=1;e.disabled=true;e.value='';e.placeholder='Payments are blocked';}}"
+                      + "kill();new MutationObserver(function(){kill();}).observe(document.documentElement,{childList:true,subtree:true});"
+                      + "document.addEventListener('submit',function(ev){var f=ev.target;if(f&&f.querySelector&&f.querySelector(sel)){ev.preventDefault();ev.stopPropagation();}},true);"
                       + "}catch(e){}})();";
 
               static final String AD_JS = "(function(){if(window.__sgAd)return;window.__sgAd=1;"
@@ -250,6 +262,9 @@ jobs:
                   String url = "";
                   String pending;
                   boolean started, desktop, popup, typed, skipUpgrade;
+                  Tab opener;                       // the tab that opened this one (closing it returns there)
+                  long pageStart;                   // when the current page started loading
+                  final HashSet<String> hops = new HashSet<>();   // pages that bounced on by themselves: "back" skips them
                   String upFrom, upTo;
                   int progress = 100;
               }
@@ -272,6 +287,15 @@ jobs:
               final Handler ui = new Handler(Looper.getMainLooper());
               static volatile int adsBlocked, threatsBlocked;
               boolean sAnti, sAds, sPopups, sNsfw, sHttps, s3p;
+              boolean sSuggest = true, sNoRedirect = true, sNoPay, sStrip = true, sNoDl, sDarkWeb;
+              int sText = 100;
+              // address-bar suggestions
+              ScrollView sugScroll;
+              LinearLayout sugList;
+              int sugSeq;
+              boolean sugSuppress, sugTyped;
+              String sugQuery = "";
+              static final class Sug { String text, sub; int kind; }   // kind: 0 search, 1 history, 2 bookmark, 3 site
               String sEngine = "google";
 
               // ================= lifecycle =================
@@ -347,8 +371,9 @@ jobs:
                   if (findBar.getVisibility() == View.VISIBLE) { closeFind(); return; }
                   if (cur == null) { finish(); return; }
                   if (urlBox.hasFocus()) { urlBox.clearFocus(); hideKb(); return; }
-                  if (cur.web.canGoBack()) { cur.web.goBack(); return; }
+                  if (goBackSmart(cur)) return;
                   if (tabs.size() > 1) { closeTab(cur); return; }
+                  if (cur.web.canGoBack() && cur.url != null && !cur.url.startsWith(Pages.BASE + "home")) { loadHome(cur); return; }
                   finish();
               }
 
@@ -370,6 +395,13 @@ jobs:
                   sHttps = prefs.getBoolean("https", true);
                   s3p = prefs.getBoolean("tp", false);
                   sEngine = prefs.getString("engine", "google");
+                  sSuggest = prefs.getBoolean("suggest", true);
+                  sNoRedirect = prefs.getBoolean("noredir", true);
+                  sNoPay = prefs.getBoolean("nopay", false);
+                  sStrip = prefs.getBoolean("strip", true);
+                  sNoDl = prefs.getBoolean("nodl", false);
+                  sDarkWeb = prefs.getBoolean("darkweb", false);
+                  sText = prefs.getInt("textsize", 100);
               }
 
               // ================= small helpers =================
@@ -495,12 +527,27 @@ jobs:
                   urlBox.setTextDirection(View.TEXT_DIRECTION_LTR);
                   urlBox.setImeOptions(EditorInfo.IME_ACTION_GO);
                   urlBox.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+                  urlBox.setHighlightColor(0x667c4dff);
+                  urlBox.addTextChangedListener(new TextWatcher() {
+                      @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+                      @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+                      @Override public void afterTextChanged(Editable e) {
+                          if (sugSuppress) return;
+                          sugTyped = true;
+                          refreshSug();
+                      }
+                  });
                   urlBox.setOnFocusChangeListener(new View.OnFocusChangeListener() {
                       @Override public void onFocusChange(View v, boolean has) {
                           if (has) {
+                              sugSuppress = true;
                               urlBox.setText(editUrl());
+                              sugSuppress = false;
+                              sugTyped = false;
                               urlBox.post(new Runnable() { @Override public void run() { urlBox.selectAll(); } });
+                              refreshSug();
                           } else {
+                              hideSug();
                               updateUrlBar();
                           }
                       }
@@ -615,8 +662,199 @@ jobs:
 
                   webHolder = new FrameLayout(this);
                   col.addView(webHolder, new LinearLayout.LayoutParams(-1, 0, 1f));
+                  sugList = new LinearLayout(this);
+                  sugList.setOrientation(LinearLayout.VERTICAL);
+                  sugList.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+                  sugScroll = new ScrollView(this);
+                  sugScroll.setBackgroundColor(C_BG);
+                  sugScroll.setVisibility(View.GONE);
+                  sugScroll.addView(sugList, new ViewGroup.LayoutParams(-1, -2));
+                  webHolder.addView(sugScroll, new FrameLayout.LayoutParams(-1, -1));
                   root.addView(col, new FrameLayout.LayoutParams(-1, -1));
                   setContentView(root);
+              }
+
+              // ================= address-bar suggestions (like Chrome) =================
+              final Runnable sugNet = new Runnable() {
+                  @Override public void run() {
+                      final String q = sugQuery;
+                      final int seq = sugSeq;
+                      final String eng = sEngine;
+                      new Thread(new Runnable() {
+                          @Override public void run() {
+                              final ArrayList<String> res = fetchSuggest(q, eng);
+                              ui.post(new Runnable() {
+                                  @Override public void run() {
+                                      if (seq != sugSeq || !urlBox.hasFocus() || !sSuggest) return;
+                                      renderSug(q, localSug(q), res);
+                                  }
+                              });
+                          }
+                      }).start();
+                  }
+              };
+
+              void hideSug() {
+                  sugSeq++;
+                  ui.removeCallbacks(sugNet);
+                  if (sugScroll != null) sugScroll.setVisibility(View.GONE);
+              }
+
+              void refreshSug() {
+                  if (sugScroll == null) return;
+                  if (!sSuggest || !urlBox.hasFocus()) { hideSug(); return; }
+                  String q = sugTyped ? urlBox.getText().toString().trim() : "";
+                  sugSeq++;
+                  ui.removeCallbacks(sugNet);
+                  renderSug(q, localSug(q), new ArrayList<String>());
+                  if (!q.isEmpty()) {
+                      sugQuery = q;
+                      ui.postDelayed(sugNet, 140);
+                  }
+              }
+
+              boolean urlLike(String q) {
+                  String l = q.toLowerCase();
+                  return l.startsWith("http://") || l.startsWith("https://") || (!q.contains(" ") && q.contains(".") && !q.startsWith(".") && !q.endsWith("."));
+              }
+
+              ArrayList<Sug> localSug(String q) {
+                  ArrayList<Sug> out = new ArrayList<>();
+                  HashSet<String> seen = new HashSet<>();
+                  String lq = q.toLowerCase();
+                  for (int pass = 0; pass < 2; pass++) {
+                      JSONArray a = getArr(pass == 0 ? "bm" : "hist");
+                      for (int i = 0; i < a.length(); i++) {
+                          JSONObject o = a.optJSONObject(i);
+                          if (o == null) continue;
+                          String u = o.optString("u"), tt = o.optString("t");
+                          if (u.isEmpty() || u.startsWith(Pages.BASE)) continue;
+                          if (!lq.isEmpty() && !u.toLowerCase().contains(lq) && !tt.toLowerCase().contains(lq)) continue;
+                          if (lq.isEmpty() && pass == 0) break;           // empty box: only recent history
+                          if (!seen.add(u)) continue;
+                          Sug s = new Sug();
+                          s.text = u;
+                          s.sub = pretty(u);
+                          s.kind = pass == 0 ? 2 : 1;
+                          s.text = u;
+                          out.add(s);
+                          if (out.size() >= (lq.isEmpty() ? 8 : 4)) return withTitles(out, a);
+                      }
+                  }
+                  return out;
+              }
+
+              private ArrayList<Sug> withTitles(ArrayList<Sug> out, JSONArray a) { return out; }
+
+              void renderSug(String q, ArrayList<Sug> local, ArrayList<String> net) {
+                  if (sugScroll == null) return;
+                  sugList.removeAllViews();
+                  HashSet<String> seen = new HashSet<>();
+                  if (!q.isEmpty()) {
+                      Sug s = new Sug();
+                      s.text = q;
+                      s.sub = "";
+                      s.kind = urlLike(q) ? 3 : 0;
+                      seen.add(q.toLowerCase());
+                      sugList.addView(sugRow(s, q));
+                  }
+                  for (Sug s : local) {
+                      seen.add(s.text.toLowerCase());
+                      sugList.addView(sugRow(s, q));
+                  }
+                  int n = 0;
+                  for (String t : net) {
+                      if (n >= 6 || !seen.add(t.toLowerCase())) continue;
+                      Sug s = new Sug();
+                      s.text = t;
+                      s.sub = "";
+                      s.kind = 0;
+                      sugList.addView(sugRow(s, q));
+                      n++;
+                  }
+                  sugScroll.setVisibility(sugList.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                  sugScroll.bringToFront();
+              }
+
+              View sugRow(final Sug s, String q) {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER_VERTICAL);
+                  row.setMinimumHeight(dp(52));
+                  row.setPadding(dp(14), dp(4), dp(2), dp(4));
+                  row.setBackground(ripple());
+                  ImageView ic = new ImageView(this);
+                  ic.setImageResource(s.kind == 1 ? R.drawable.ic_history : s.kind == 2 ? R.drawable.ic_star
+                          : s.kind == 3 ? R.drawable.ic_globe : R.drawable.ic_search);
+                  ic.setColorFilter(s.kind == 2 ? C_ACCENT : C_MUTED);
+                  row.addView(ic, new LinearLayout.LayoutParams(dp(22), dp(22)));
+                  LinearLayout mid = new LinearLayout(this);
+                  mid.setOrientation(LinearLayout.VERTICAL);
+                  mid.setPadding(dp(16), 0, dp(8), 0);
+                  String shown = (s.kind == 1 || s.kind == 2) ? pretty(s.text) : s.text;
+                  SpannableString ss = new SpannableString(shown);
+                  if (s.kind == 0 && !q.isEmpty() && shown.toLowerCase().startsWith(q.toLowerCase()) && shown.length() > q.length())
+                      ss.setSpan(new StyleSpan(Typeface.BOLD), q.length(), shown.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                  TextView tv = text("", 15, C_TEXT);
+                  tv.setText(ss);
+                  tv.setSingleLine(true);
+                  tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                  tv.setTextDirection(View.TEXT_DIRECTION_LTR);
+                  mid.addView(tv);
+                  if (s.kind == 3) {
+                      TextView sb = text(S.t("open_site"), 12, C_ACCENT);
+                      mid.addView(sb);
+                  }
+                  row.addView(mid, new LinearLayout.LayoutParams(0, -2, 1f));
+                  row.setOnClickListener(new View.OnClickListener() {
+                      @Override public void onClick(View v) {
+                          urlBox.clearFocus();
+                          hideKb();
+                          hideSug();
+                          go(s.text);
+                      }
+                  });
+                  ImageView fill = iconBtn(R.drawable.ic_fill, new View.OnClickListener() {
+                      @Override public void onClick(View v) {
+                          urlBox.setText(s.text);
+                          urlBox.setSelection(urlBox.getText().length());
+                      }
+                  });
+                  fill.setColorFilter(C_MUTED);
+                  row.addView(fill, new LinearLayout.LayoutParams(dp(44), dp(44)));
+                  return row;
+              }
+
+              ArrayList<String> fetchSuggest(String q, String eng) {
+                  ArrayList<String> out = new ArrayList<>();
+                  try {
+                      String e = Pages.enc(q), u;
+                      if ("duckduckgo".equals(eng)) u = "https://duckduckgo.com/ac/?type=list&q=" + e;
+                      else if ("bing".equals(eng)) u = "https://api.bing.com/osjson.aspx?query=" + e;
+                      else if ("brave".equals(eng)) u = "https://search.brave.com/api/suggest?q=" + e;
+                      else u = "https://suggestqueries.google.com/complete/search?client=firefox&q=" + e;
+                      HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+                      c.setConnectTimeout(3500);
+                      c.setReadTimeout(3500);
+                      c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36");
+                      if (c.getResponseCode() != 200) { c.disconnect(); return out; }
+                      InputStream in = c.getInputStream();
+                      ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                      byte[] buf = new byte[4096];
+                      int n;
+                      while ((n = in.read(buf)) > 0 && bo.size() < 100000) bo.write(buf, 0, n);
+                      in.close();
+                      c.disconnect();
+                      JSONArray a = new JSONArray(bo.toString("UTF-8"));
+                      JSONArray l = a.optJSONArray(1);
+                      if (l != null) {
+                          for (int i = 0; i < l.length() && out.size() < 8; i++) {
+                              String s = l.optString(i, "").trim();
+                              if (!s.isEmpty()) out.add(s);
+                          }
+                      }
+                  } catch (Exception ex) { /* no suggestions */ }
+                  return out;
               }
 
               void closeFind() {
@@ -717,7 +955,8 @@ jobs:
                       cur = null;
                       newTab(null, true);
                   } else if (cur == t) {
-                      switchTo(tabs.get(Math.max(0, i - 1)));
+                      Tab o = (t.opener != null && tabs.contains(t.opener)) ? t.opener : null;
+                      switchTo(o != null ? o : tabs.get(Math.max(0, i - 1)));
                   }
                   updateTabCount();
               }
@@ -818,6 +1057,16 @@ jobs:
                   String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
                   if (host.equals(Pages.HOST)) return false;
                   if (!(sch.equals("http") || sch.equals("https"))) return false;
+                  if (sNoPay && Shield.isPayment(url, host)) {
+                      threatsBlocked++;
+                      toast(S.t("pay_blocked"));
+                      load(t, Pages.BASE + "blocked?u=" + Pages.enc(url) + "&p=1");
+                      return true;
+                  }
+                  if (sStrip) {
+                      String clean = stripTracking(url);
+                      if (!clean.equals(url)) { t.web.loadUrl(clean); return true; }
+                  }
                   if (sAds && !typed && Shield.isAd(host)) {
                       adsBlocked++;
                       toast(S.t("ad_redirect"));
@@ -834,6 +1083,85 @@ jobs:
                       return true;
                   }
                   return false;
+              }
+
+              // ---- back that skips pages which bounced on by themselves (ad / tracker redirect hops) ----
+              int backTarget(Tab t) {
+                  try {
+                      WebBackForwardList l = t.web.copyBackForwardList();
+                      int ci = l.getCurrentIndex();
+                      for (int i = ci - 1; i >= 0; i--) {
+                          String u = l.getItemAtIndex(i).getUrl();
+                          if (u == null || !t.hops.contains(u)) return i - ci;
+                      }
+                  } catch (Exception e) { /* no history */ }
+                  return 0;
+              }
+
+              boolean goBackSmart(Tab t) {
+                  int off = backTarget(t);
+                  if (off == 0) return false;
+                  t.web.goBackOrForward(off);
+                  return true;
+              }
+
+              static String regDomain(String h) {
+                  if (h == null) return "";
+                  String[] p = h.split("\\.");
+                  int n = p.length;
+                  if (n <= 2) return h;
+                  String last = p[n - 1], sec = p[n - 2];
+                  if (last.length() == 2 && (sec.equals("co") || sec.equals("com") || sec.equals("org") || sec.equals("net")
+                          || sec.equals("gov") || sec.equals("edu") || sec.equals("ac"))) return p[n - 3] + "." + sec + "." + last;
+                  return sec + "." + last;
+              }
+
+              /** A page that navigates away by itself (no tap, not a server redirect). true = blocked. */
+              boolean autoRedirect(Tab t, WebResourceRequest req) {
+                  if (req.hasGesture() || req.isRedirect()) return false;
+                  String cu = t.url;
+                  if (!isWeb(cu) || cu.startsWith(Pages.BASE)) return false;
+                  Uri nu = req.getUrl();
+                  if (!isWeb(nu.toString())) return false;
+                  String nh = nu.getHost() == null ? "" : nu.getHost().toLowerCase();
+                  if (nh.equals(Pages.HOST)) return false;
+                  long age = System.currentTimeMillis() - t.pageStart;
+                  if (age < 2500) { t.hops.add(cu); return false; }      // quick bounce page (link shortener, tracker): allowed, "back" skips it
+                  if (!sNoRedirect) { if (age < 6000) t.hops.add(cu); return false; }
+                  Uri cp = Uri.parse(cu);
+                  String ch = cp.getHost() == null ? "" : cp.getHost().toLowerCase();
+                  if (regDomain(ch).equals(regDomain(nh)) || Shield.isTrusted(nh)) return false;
+                  toast(S.t("redirect_blocked").replace("{h}", nh));
+                  return true;
+              }
+
+              static final String[] TRACK_PREFIX = {"utm_", "mtm_", "pk_"};
+              static final String[] TRACK_KEYS = {"fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "mc_eid", "mc_cid",
+                      "igshid", "twclid", "ttclid", "li_fat_id", "_hsenc", "_hsmi", "vero_id", "oly_enc_id", "oly_anon_id", "s_cid"};
+
+              static String stripTracking(String url) {
+                  try {
+                      int qi = url.indexOf('?');
+                      if (qi < 0) return url;
+                      int hi = url.indexOf('#', qi);
+                      String frag = hi < 0 ? "" : url.substring(hi);
+                      String query = hi < 0 ? url.substring(qi + 1) : url.substring(qi + 1, hi);
+                      StringBuilder keep = new StringBuilder();
+                      boolean removed = false;
+                      for (String part : query.split("&")) {
+                          if (part.isEmpty()) continue;
+                          int eq = part.indexOf('=');
+                          String key = (eq >= 0 ? part.substring(0, eq) : part).toLowerCase(Locale.ROOT);
+                          boolean track = false;
+                          for (String pf : TRACK_PREFIX) if (key.startsWith(pf)) track = true;
+                          for (String k : TRACK_KEYS) if (key.equals(k)) track = true;
+                          if (track) { removed = true; continue; }
+                          if (keep.length() > 0) keep.append('&');
+                          keep.append(part);
+                      }
+                      if (!removed) return url;
+                      return url.substring(0, qi) + (keep.length() > 0 ? "?" + keep : "") + frag;
+                  } catch (Exception e) { return url; }
               }
 
               void closeLater(final Tab t) {
@@ -877,8 +1205,8 @@ jobs:
               }
 
               void leave(Tab t) {
-                  if (t.web.canGoBack()) t.web.goBack();
-                  else if (t.popup && tabs.size() > 1) closeLater(t);
+                  if (goBackSmart(t)) { /* went back */ }
+                  else if ((t.popup || t.opener != null) && tabs.size() > 1) closeLater(t);
                   else loadHome(t);
               }
 
@@ -919,6 +1247,8 @@ jobs:
                   s.setLoadWithOverviewMode(true);
                   s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
                   s.setSafeBrowsingEnabled(true);
+                  s.setTextZoom(sText);
+                  if (Build.VERSION.SDK_INT >= 29) s.setForceDark(sDarkWeb ? WebSettings.FORCE_DARK_ON : WebSettings.FORCE_DARK_OFF);
                   s.setUserAgentString(t.desktop ? DESKTOP_UA : mobileUa);
                   CookieManager.getInstance().setAcceptCookie(true);
                   CookieManager.getInstance().setAcceptThirdPartyCookies(w, !s3p);
@@ -945,6 +1275,12 @@ jobs:
                       String host = p.getHost() == null ? "" : p.getHost();
                       Shield.Result r = Shield.check(host, url, true);
                       html = Pages.blocked(url, r, false);
+                      if (u.getQueryParameter("p") != null) {
+                          Shield.Result r3 = new Shield.Result();
+                          r3.category = "payment";
+                          r3.flags.add(new String[]{"flag_payment", ""});
+                          html = Pages.blocked(url, r3, false);
+                      }
                       if (u.getQueryParameter("r") != null) {
                           Shield.Result r2 = new Shield.Result();
                           r2.category = "adult";
@@ -973,6 +1309,15 @@ jobs:
                           Uri u = req.getUrl();
                           String host = u.getHost();
                           if (host != null && host.equals(Pages.HOST)) return internalPage(u);
+                          if (sNoPay && host != null && Shield.isPayment(u.toString(), host.toLowerCase())) {
+                              if (!req.isForMainFrame()) return empty(403);
+                              threatsBlocked++;
+                              Shield.Result pr = new Shield.Result();
+                              pr.category = "payment";
+                              pr.flags.add(new String[]{"flag_payment", ""});
+                              return new WebResourceResponse("text/html", "utf-8", 200, "OK", new HashMap<String, String>(),
+                                      new ByteArrayInputStream(Pages.blocked(u.toString(), pr, false).getBytes(StandardCharsets.UTF_8)));
+                          }
                           if (sAds && !req.isForMainFrame() && host != null && Shield.isAd(host.toLowerCase())) {
                               adsBlocked++;
                               return empty(200);
@@ -983,11 +1328,13 @@ jobs:
                       @Override
                       public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
                           if (!req.isForMainFrame()) return false;
+                          if (autoRedirect(t, req)) return true;
                           return handleNav(t, req.getUrl().toString(), req.hasGesture());
                       }
 
                       @Override
                       public void onPageStarted(WebView v, String url, Bitmap fav) {
+                          t.pageStart = System.currentTimeMillis();
                           t.url = url == null ? "" : url;
                           t.title = "";
                           if (isWeb(url) && !url.startsWith(Pages.BASE)) {
@@ -1007,6 +1354,7 @@ jobs:
                       @Override
                       public void onPageCommitVisible(WebView v, String url) {
                           if (t.desktop && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(DESKTOP_JS, null);
+                          if (sNoPay && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(PAY_JS, null);
                       }
 
                       @Override
@@ -1019,6 +1367,7 @@ jobs:
                           if (url == null || url.startsWith(Pages.BASE) || !isWeb(url)) return;
                           addHistory(t.title, url);
                           if (t.desktop) v.evaluateJavascript(DESKTOP_JS, null);
+                          if (sNoPay) v.evaluateJavascript(PAY_JS, null);
                           if (sAds) v.evaluateJavascript(AD_JS, null);
                           v.evaluateJavascript(SCAN_JS, new ValueCallback<String>() {
                               @Override public void onReceiveValue(String value) { analyze(t, value); }
@@ -1069,6 +1418,7 @@ jobs:
                               return false;
                           }
                           Tab nt = newTab(null, false);
+                          nt.opener = t;
                           nt.popup = true;
                           nt.started = true;
                           nt.pending = null;
@@ -1112,6 +1462,7 @@ jobs:
                   w.setDownloadListener(new android.webkit.DownloadListener() {
                       @Override
                       public void onDownloadStart(String url, String ua, String cd, String mime, long len) {
+                          if (sNoDl) { toast(S.t("dl_blocked")); return; }
                           startDownload(url, ua, cd, mime);
                       }
                   });
@@ -1320,7 +1671,7 @@ jobs:
                   row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
                   row.setGravity(Gravity.CENTER);
                   ImageView back = iconBtn(R.drawable.ic_back, new View.OnClickListener() {
-                      @Override public void onClick(View v) { menu.dismiss(); if (cur.web.canGoBack()) cur.web.goBack(); }
+                      @Override public void onClick(View v) { menu.dismiss(); if (!goBackSmart(cur) && cur.web.canGoBack()) loadHome(cur); }
                   });
                   back.setAlpha(cur.web.canGoBack() ? 1f : 0.35f);
                   ImageView fwd = iconBtn(R.drawable.ic_forward, new View.OnClickListener() {
@@ -1820,7 +2171,7 @@ jobs:
                   sw.setThumbTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}},
                           new int[]{C_ACCENT, 0xFFB0B6C6}));
                   sw.setTrackTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}},
-                          new int[]{0x884F8CFF, 0x55FFFFFF}));
+                          new int[]{0x887c4dff, 0x55FFFFFF}));
                   sw.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
                       @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
                           prefs.edit().putBoolean(key, on).apply();
@@ -1867,6 +2218,12 @@ jobs:
                   switchRow(p, S.t("set_nsfw"), S.t("set_nsfw_d"), "nsfw", true, null);
                   switchRow(p, S.t("set_https"), S.t("set_https_d"), "https", true, null);
                   switchRow(p, S.t("set_3p"), S.t("set_3p_d"), "tp", false, null);
+                  switchRow(p, S.t("set_redirect"), S.t("set_redirect_d"), "noredir", true, null);
+                  switchRow(p, S.t("set_strip"), S.t("set_strip_d"), "strip", true, null);
+                  switchRow(p, S.t("set_nopay"), S.t("set_nopay_d"), "nopay", false, new Runnable() {
+                      @Override public void run() { for (Tab t : tabs) if (t.web != null) t.web.reload(); }
+                  });
+                  switchRow(p, S.t("set_nodl"), S.t("set_nodl_d"), "nodl", false, null);
                   valueRow(p, S.t("set_lists"), S.t("stats").replace("{a}", String.valueOf(adsBlocked))
                           .replace("{t}", String.valueOf(threatsBlocked)), new View.OnClickListener() {
                       @Override public void onClick(View v) {
@@ -1886,6 +2243,27 @@ jobs:
 
                   section(p, S.t("set_general"));
                   switchRow(p, S.t("set_desktop_def"), S.t("set_desktop_def_d"), "def_desktop", false, null);
+                  switchRow(p, S.t("set_suggest"), S.t("set_suggest_d"), "suggest", true, null);
+                  switchRow(p, S.t("set_darkweb"), S.t("set_darkweb_d"), "darkweb", false, null);
+                  final String[] szNames = {S.t("size_s"), S.t("size_n"), S.t("size_l"), S.t("size_xl")};
+                  final int[] szVals = {85, 100, 120, 145};
+                  String curSz = szNames[1];
+                  for (int i = 0; i < szVals.length; i++) if (szVals[i] == sText) curSz = szNames[i];
+                  final TextView szVal = valueRow(p, S.t("set_textsize"), curSz, null);
+                  ((View) szVal.getParent()).setOnClickListener(new View.OnClickListener() {
+                      @Override public void onClick(View v) {
+                          new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                                  .setTitle(S.t("set_textsize"))
+                                  .setItems(szNames, new android.content.DialogInterface.OnClickListener() {
+                                      @Override public void onClick(android.content.DialogInterface di, int which) {
+                                          prefs.edit().putInt("textsize", szVals[which]).apply();
+                                          loadSettings();
+                                          applyAllSettings();
+                                          szVal.setText(szNames[which]);
+                                      }
+                                  }).show();
+                      }
+                  });
                   final String[] langCodes = {"en", "ar", "fr"};
                   final String[] langNames = {"English", "العربية", "Français"};
                   String curLang = "English";
@@ -2004,15 +2382,15 @@ jobs:
                           + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
                           + "<title>" + esc(title) + "</title><style>"
                           + "*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}"
-                          + "body{margin:0;background:#0f1117;color:#e8eaf0;font-family:sans-serif;min-height:100vh;"
+                          + "body{margin:0;background:#0D0B14;color:#e8eaf0;font-family:sans-serif;min-height:100vh;"
                           + "display:flex;flex-direction:column;align-items:center;padding:28px 18px}"
-                          + ".card{width:100%;max-width:460px;background:#171a23;border:1px solid #262b38;border-radius:20px;padding:24px}"
+                          + ".card{width:100%;max-width:460px;background:#15121F;border:1px solid #2B2540;border-radius:20px;padding:24px}"
                           + "h1{font-size:21px;margin:12px 0 8px;color:" + accent + "}"
                           + "p{color:#aab0c0;line-height:1.5;font-size:15px;margin:6px 0}"
                           + ".ico{font-size:54px;text-align:center}"
                           + ".ei{width:1em;height:1em;object-fit:contain;vertical-align:-0.12em}"
                           + "ul{padding-inline-start:20px;color:#c8cddb;font-size:14px;line-height:1.6}"
-                          + ".url{word-break:break-all;background:#0f1117;border-radius:10px;padding:10px;font-size:13px;color:#8d95aa;margin:12px 0}"
+                          + ".url{word-break:break-all;background:#0D0B14;border-radius:10px;padding:10px;font-size:13px;color:#8d95aa;margin:12px 0}"
                           + ".btn{display:block;text-align:center;text-decoration:none;border-radius:14px;padding:14px;font-size:16px;font-weight:bold;margin-top:12px}"
                           + ".primary{background:" + accent + ";color:#fff}"
                           + ".ghost{background:transparent;border:1px solid #333a4d;color:#aab0c0;font-weight:normal;font-size:14px}"
@@ -2021,8 +2399,9 @@ jobs:
 
               static String blocked(String url, Shield.Result r, boolean extraRta) {
                   String cat = r.category == null ? "unwanted" : r.category;
-                  String accent = cat.equals("adult") ? "#e0568a" : "#e5484d";
-                  String icon = cat.equals("adult") ? ic("adult", "🔞") : ic("shield", "🛡️");
+                  boolean pay = cat.equals("payment");
+                  String accent = pay ? "#f59e0b" : cat.equals("adult") ? "#e0568a" : "#e5484d";
+                  String icon = pay ? ic("payment", "💳") : cat.equals("adult") ? ic("adult", "🔞") : ic("shield", "🛡️");
                   String title = S.t("warn_" + cat);
                   StringBuilder sb = new StringBuilder(head(title, accent));
                   sb.append("<div class=\"card\"><div class=\"ico\">").append(icon).append("</div>");
@@ -2037,7 +2416,7 @@ jobs:
                   }
                   sb.append("</ul>");
                   sb.append("<a class=\"btn primary\" href=\"").append(BASE).append("leave\">").append(esc(S.t("warn_leave"))).append("</a>");
-                  sb.append("<a class=\"btn ghost\" href=\"").append(BASE).append("continue?u=").append(enc(url)).append("\">")
+                  if (!pay) sb.append("<a class=\"btn ghost\" href=\"").append(BASE).append("continue?u=").append(enc(url)).append("\">")
                           .append(esc(S.t("warn_continue"))).append("</a>");
                   sb.append("</div></body></html>");
                   return sb.toString();
@@ -2046,7 +2425,7 @@ jobs:
               static String error(String url, String desc, boolean ssl) {
                   String title = ssl ? S.t("ssl_title") : S.t("err_title");
                   String body = ssl ? S.t("ssl_msg") : desc;
-                  StringBuilder sb = new StringBuilder(head(title, ssl ? "#e5484d" : "#4f8cff"));
+                  StringBuilder sb = new StringBuilder(head(title, ssl ? "#e5484d" : "#7c4dff"));
                   sb.append("<div class=\"card\"><div class=\"ico\">").append(ssl ? ic("lock", "🔒") : ic("offline", "📡")).append("</div>");
                   sb.append("<h1>").append(esc(title)).append("</h1>");
                   sb.append("<div class=\"url\">").append(esc(url)).append("</div>");
@@ -2069,15 +2448,15 @@ jobs:
                           {"GitHub", "https://github.com/", ic("tile_github", "⌘")},
                           {"Discord", "https://discord.gg/kz4mpxw4Ga", ic("tile_discord", "💬")}
                   };
-                  StringBuilder sb = new StringBuilder(head("Ven", "#4f8cff"));
+                  StringBuilder sb = new StringBuilder(head("Ven", "#7c4dff"));
                   sb.append("<style>.logo{font-size:64px;margin-top:30px}.t{font-size:26px;font-weight:bold;margin:6px 0 2px}"
                           + ".sub{color:#8d95aa;font-size:14px;margin-bottom:22px}"
                           + "form{width:100%;max-width:460px}"
-                          + "input{width:100%;background:#171a23;border:1px solid #262b38;border-radius:28px;padding:15px 20px;font-size:16px;color:#e8eaf0;outline:none}"
+                          + "input{width:100%;background:#15121F;border:1px solid #2B2540;border-radius:28px;padding:15px 20px;font-size:16px;color:#e8eaf0;outline:none}"
                           + ".grid{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:26px;max-width:460px}"
                           + ".tile{width:76px;text-align:center;text-decoration:none;color:#c8cddb;font-size:12px}"
-                          + ".tile span{display:flex;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;background:#1d212d;"
-                          + "align-items:center;justify-content:center;font-size:22px;color:#4f8cff}"
+                          + ".tile span{display:flex;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;background:#201B2E;"
+                          + "align-items:center;justify-content:center;font-size:22px;color:#7c4dff}"
                           + ".tile span .ei{width:34px;height:34px;border-radius:8px}"
                           + ".stats .ei{width:1.3em;height:1.3em}</style>");
                   sb.append("<style>.stats{margin-top:34px;color:#6f778c;font-size:13px;text-align:center}</style>");
@@ -2227,7 +2606,30 @@ jobs:
                   p("open_new", "Open in new tab", "فتح في علامة تبويب جديدة", "Ouvrir dans un nouvel onglet");
                   p("tagline", "Safe browsing, built in", "تصفح آمن، بحماية مدمجة", "Navigation sûre, protection intégrée");
                   p("ver", "Version", "الإصدار", "Version");
-                  p("copyright", "© 2026 فديسك (@fire_1006). All rights reserved.", "© 2026 فديسك (@fire_1006). جميع الحقوق محفوظة.", "© 2026 فديسك (@fire_1006). Tous droits réservés.");
+                  p("copyright", "© 2026 @fire_1006. All rights reserved.", "© 2026 فديسك (@fire_1006). جميع الحقوق محفوظة.", "© 2026 @fire_1006. Tous droits réservés.");
+                  p("open_site", "Open website", "فتح الموقع", "Ouvrir le site");
+                  p("set_redirect", "Block auto-redirects", "حظر إعادة التوجيه التلقائي", "Bloquer les redirections automatiques");
+                  p("set_redirect_d", "Stops a page from sending you to another site (ads) without you tapping", "يمنع الصفحة من نقلك لموقع آخر (إعلانات) دون أن تضغط", "Empêche une page de vous envoyer vers un autre site (pubs) sans clic");
+                  p("redirect_blocked", "Redirect blocked: {h}", "تم حظر إعادة توجيه إلى: {h}", "Redirection bloquée : {h}");
+                  p("set_strip", "Remove tracking from links", "إزالة التتبع من الروابط", "Retirer le suivi des liens");
+                  p("set_strip_d", "Cleans utm_, fbclid, gclid and similar tags", "ينظّف وسوم utm_ و fbclid و gclid وما شابهها", "Nettoie les balises utm_, fbclid, gclid et similaires");
+                  p("set_nopay", "Block payments", "حظر الدفع", "Bloquer les paiements");
+                  p("set_nopay_d", "Blocks card, PayPal, Roblox/Robux and other payment pages and card fields", "يحظر صفحات وحقول الدفع: البطاقات و PayPal و Roblox/Robux وغيرها", "Bloque les pages et champs de paiement : cartes, PayPal, Roblox/Robux et autres");
+                  p("warn_payment", "Payments are blocked", "الدفع محظور", "Les paiements sont bloqués");
+                  p("flag_payment", "Payment blocking is turned on in the Ven settings.", "حظر الدفع مفعّل في إعدادات Ven.", "Le blocage des paiements est activé dans les réglages de Ven.");
+                  p("pay_blocked", "Payment blocked", "تم حظر الدفع", "Paiement bloqué");
+                  p("set_nodl", "Block all downloads", "حظر جميع التنزيلات", "Bloquer tous les téléchargements");
+                  p("set_nodl_d", "No file can be downloaded", "لا يمكن تنزيل أي ملف", "Aucun fichier ne peut être téléchargé");
+                  p("dl_blocked", "Downloads are blocked", "التنزيلات محظورة", "Les téléchargements sont bloqués");
+                  p("set_suggest", "Search suggestions", "اقتراحات البحث", "Suggestions de recherche");
+                  p("set_suggest_d", "Shows suggestions while you type (the text is sent to your search engine)", "تظهر اقتراحات أثناء الكتابة (يُرسل النص لمحرك البحث)", "Affiche des suggestions pendant la saisie (le texte est envoyé à votre moteur de recherche)");
+                  p("set_darkweb", "Dark mode for websites", "الوضع الداكن للمواقع", "Mode sombre pour les sites");
+                  p("set_darkweb_d", "Forces a dark look on pages (Android 10+)", "يفرض مظهراً داكناً على الصفحات (أندرويد 10+)", "Force un style sombre sur les pages (Android 10+)");
+                  p("set_textsize", "Text size", "حجم النص", "Taille du texte");
+                  p("size_s", "Small", "صغير", "Petit");
+                  p("size_n", "Normal", "عادي", "Normal");
+                  p("size_l", "Large", "كبير", "Grand");
+                  p("size_xl", "Huge", "ضخم", "Très grand");
                   p("credits", "Protection lists: StevenBlack/hosts (MIT) and abuse.ch URLhaus (CC0). Web engine: Android System WebView (Chromium).", "قوائم الحماية: StevenBlack/hosts (MIT) و abuse.ch URLhaus (CC0). محرك الويب: Android System WebView (Chromium).", "Listes de protection : StevenBlack/hosts (MIT) et abuse.ch URLhaus (CC0). Moteur web : Android System WebView (Chromium).");
                   p("join_support", "Join the support server", "انضم لسيرفر الدعم", "Rejoindre le serveur d'assistance");
                   p("share_via", "Share via", "مشاركة عبر", "Partager via");
@@ -2526,6 +2928,35 @@ jobs:
                       h = h.substring(i + 1);
                       if (h.indexOf('.') < 0) return false;
                   }
+              }
+
+              // ---- payment blocking (the "Block payments" setting) ----
+              private static final String[] PAY_HOSTS = {
+                      "paypal.com", "paypal.me", "paypalobjects.com", "stripe.com", "stripe.network", "pay.google.com",
+                      "payments.google.com", "checkout.com", "braintreegateway.com", "braintree-api.com", "adyen.com",
+                      "squareup.com", "klarna.com", "afterpay.com", "razorpay.com", "paytm.com", "payu.in", "payu.com",
+                      "mollie.com", "2checkout.com", "authorize.net", "worldpay.com", "cardinalcommerce.com", "venmo.com",
+                      "cash.app", "skrill.com", "neteller.com", "payoneer.com", "paddle.com", "fastspring.com",
+                      "checkout.shopify.com", "billing.roblox.com", "cybersource.com", "paysafecard.com", "pay.amazon.com"
+              };
+
+              static boolean isPayment(String url, String host) {
+                  if (host == null || url == null) return false;
+                  if (inArr(PAY_HOSTS, host)) return true;
+                  String path = "";
+                  int q = url.indexOf("://");
+                  if (q >= 0) {
+                      int s = url.indexOf('/', q + 3);
+                      path = s < 0 ? "" : url.substring(s).toLowerCase();
+                  }
+                  if (host.equals("roblox.com") || host.endsWith(".roblox.com")) {
+                      if (path.startsWith("/upgrades") || path.startsWith("/robux") || path.startsWith("/gift-cards")
+                              || path.startsWith("/giftcards") || path.contains("/purchase") || path.contains("/billing")) return true;
+                  }
+                  if (host.endsWith("steampowered.com") && (path.startsWith("/checkout") || path.startsWith("/cart"))) return true;
+                  return path.startsWith("/checkout") || path.contains("/checkout/") || path.contains("/checkouts/")
+                          || path.startsWith("/payment") || path.contains("/payments/") || path.startsWith("/billing")
+                          || path.startsWith("/pay/") || path.startsWith("/purchase");
               }
 
               static boolean isTrusted(String host) { return host != null && (inArr(TRUSTED, host) || inSet(oTrust, host)); }
@@ -4223,6 +4654,28 @@ jobs:
               <path
                   android:fillColor="#FFFFFFFF"
                   android:pathData="M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z" />
+          </vector>
+          SGB_EOF
+          cat > sgb-android/app/src/main/res/drawable/ic_fill.xml <<'SGB_EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M5,15h2V8.41L18.59,20 20,18.59 8.41,7H15V5H5z" />
+          </vector>
+          SGB_EOF
+          cat > sgb-android/app/src/main/res/drawable/ic_globe.xml <<'SGB_EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM4,12c0,-0.61 0.08,-1.21 0.21,-1.78L8.99,15v1c0,1.1 0.9,2 2,2v1.93C7.06,19.43 4,16.07 4,12zM18.89,17.4c-0.26,-0.81 -1,-1.4 -1.9,-1.4h-1v-3c0,-0.55 -0.45,-1 -1,-1h-6v-2h2c0.55,0 1,-0.45 1,-1V7h2c1.1,0 2,-0.9 2,-2v-0.41C17.92,5.77 20,8.65 20,12c0,2.08 -0.81,3.98 -2.11,5.4z" />
           </vector>
           SGB_EOF
           cat > sgb-android/app/src/main/res/drawable/ic_up.xml <<'SGB_EOF'
