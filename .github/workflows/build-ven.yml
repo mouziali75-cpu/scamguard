@@ -67,8 +67,8 @@ jobs:
                   applicationId 'app.ven.browser'
                   minSdk 26
                   targetSdk 34
-                  versionCode 3
-                  versionName '1.2'
+                  versionCode 4
+                  versionName '1.3'
               }
 
               compileOptions {
@@ -245,7 +245,7 @@ jobs:
                       + "var r=e.getBoundingClientRect();var big=r.width>=w*0.9&&r.height>=h*0.9;"
                       + "var tr=parseFloat(cs.opacity)<0.1||cs.backgroundColor==='rgba(0, 0, 0, 0)'||cs.backgroundColor==='transparent';"
                       + "var em=(e.innerText||'').trim().length===0&&e.querySelectorAll('input,button,video,img').length===0;"
-                      + "if(big&&tr&&em){e.remove();}}}}catch(x){}}"
+                      + "if(big&&tr&&em){e.style.setProperty('pointer-events','none','important');}}}}catch(x){}}"
                       + "var n=0;var iv=setInterval(function(){sweep();if(++n>12)clearInterval(iv);},800);})();";
 
               static final String SCAN_JS = "(function(){var t=((document.body&&document.body.innerText)||'').toLowerCase().slice(0,20000);"
@@ -284,6 +284,19 @@ jobs:
               ValueCallback<Uri[]> fileCb;
               String mobileUa;
               final HashSet<String> allowed = new HashSet<>();
+              final HashSet<String> siteOff = new HashSet<>();   // sites where the user turned the protections off
+
+              static String hostOfUrl(String u) {
+                  try { String h = Uri.parse(u).getHost(); return h == null ? "" : h.toLowerCase(); } catch (Exception e) { return ""; }
+              }
+              boolean off(String host) {
+                  if (host == null || host.isEmpty()) return false;
+                  return siteOff.contains(regDomain(host.toLowerCase()));
+              }
+              /** trusted big sites (Discord, Google, ...) or sites the user allowed: no page scripts / redirect / cookie limits */
+              boolean relaxed(String host) {
+                  return host != null && !host.isEmpty() && (off(host) || Shield.isTrusted(host.toLowerCase()));
+              }
               final Handler ui = new Handler(Looper.getMainLooper());
               static volatile int adsBlocked, threatsBlocked;
               boolean sAnti, sAds, sPopups, sNsfw, sHttps, s3p;
@@ -402,6 +415,8 @@ jobs:
                   sNoDl = prefs.getBoolean("nodl", false);
                   sDarkWeb = prefs.getBoolean("darkweb", false);
                   sText = prefs.getInt("textsize", 100);
+                  siteOff.clear();
+                  siteOff.addAll(prefs.getStringSet("siteoff", new HashSet<String>()));
               }
 
               // ================= small helpers =================
@@ -1042,7 +1057,7 @@ jobs:
               boolean blockCheck(Tab t, String url, String host) {
                   if (!(sAnti || sNsfw)) return false;
                   Shield.Result r = Shield.check(host, url, sNsfw);
-                  if (!r.hard || allowed.contains(host)) return false;
+                  if (!r.hard || allowed.contains(host) || off(host)) return false;
                   boolean adult = "adult".equals(r.category);
                   if (adult ? !sNsfw : !sAnti) return false;
                   threatsBlocked++;
@@ -1057,13 +1072,13 @@ jobs:
                   String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
                   if (host.equals(Pages.HOST)) return false;
                   if (!(sch.equals("http") || sch.equals("https"))) return false;
-                  if (sNoPay && Shield.isPayment(url, host)) {
+                  if (sNoPay && !off(host) && Shield.isPayment(url, host)) {
                       threatsBlocked++;
                       toast(S.t("pay_blocked"));
                       load(t, Pages.BASE + "blocked?u=" + Pages.enc(url) + "&p=1");
                       return true;
                   }
-                  if (sStrip) {
+                  if (sStrip && !relaxed(host)) {
                       String clean = stripTracking(url);
                       if (!clean.equals(url)) { t.web.loadUrl(clean); return true; }
                   }
@@ -1130,7 +1145,7 @@ jobs:
                   if (!sNoRedirect) { if (age < 6000) t.hops.add(cu); return false; }
                   Uri cp = Uri.parse(cu);
                   String ch = cp.getHost() == null ? "" : cp.getHost().toLowerCase();
-                  if (regDomain(ch).equals(regDomain(nh)) || Shield.isTrusted(nh)) return false;
+                  if (regDomain(ch).equals(regDomain(nh)) || Shield.isTrusted(nh) || relaxed(ch)) return false;
                   toast(S.t("redirect_blocked").replace("{h}", nh));
                   return true;
               }
@@ -1195,7 +1210,7 @@ jobs:
                       return true;
                   }
                   boolean okScheme = sch.equals("tel") || sch.equals("mailto") || sch.equals("sms") || sch.equals("geo")
-                          || sch.equals("whatsapp") || sch.equals("tg");
+                          || sch.equals("whatsapp") || sch.equals("tg") || sch.equals("discord");
                   if (gesture && okScheme) {
                       try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { toast(S.t("blocked_app")); }
                   } else {
@@ -1309,7 +1324,7 @@ jobs:
                           Uri u = req.getUrl();
                           String host = u.getHost();
                           if (host != null && host.equals(Pages.HOST)) return internalPage(u);
-                          if (sNoPay && host != null && Shield.isPayment(u.toString(), host.toLowerCase())) {
+                          if (sNoPay && host != null && !off(host) && !off(hostOfUrl(t.url)) && Shield.isPayment(u.toString(), host.toLowerCase())) {
                               if (!req.isForMainFrame()) return empty(403);
                               threatsBlocked++;
                               Shield.Result pr = new Shield.Result();
@@ -1318,7 +1333,7 @@ jobs:
                               return new WebResourceResponse("text/html", "utf-8", 200, "OK", new HashMap<String, String>(),
                                       new ByteArrayInputStream(Pages.blocked(u.toString(), pr, false).getBytes(StandardCharsets.UTF_8)));
                           }
-                          if (sAds && !req.isForMainFrame() && host != null && Shield.isAd(host.toLowerCase())) {
+                          if (sAds && !req.isForMainFrame() && host != null && !relaxed(hostOfUrl(t.url)) && Shield.isAd(host.toLowerCase())) {
                               adsBlocked++;
                               return empty(200);
                           }
@@ -1340,6 +1355,7 @@ jobs:
                           if (isWeb(url) && !url.startsWith(Pages.BASE)) {
                               Uri u = Uri.parse(url);
                               String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
+                              CookieManager.getInstance().setAcceptThirdPartyCookies(v, !s3p || relaxed(host));
                               if (blockCheck(t, url, host)) v.stopLoading();
                           }
                           if (t == cur) { updateUrlBar(); banner.setVisibility(View.GONE); }
@@ -1354,7 +1370,7 @@ jobs:
                       @Override
                       public void onPageCommitVisible(WebView v, String url) {
                           if (t.desktop && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(DESKTOP_JS, null);
-                          if (sNoPay && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(PAY_JS, null);
+                          if (sNoPay && isWeb(url) && !url.startsWith(Pages.BASE) && !off(hostOfUrl(url))) v.evaluateJavascript(PAY_JS, null);
                       }
 
                       @Override
@@ -1367,8 +1383,8 @@ jobs:
                           if (url == null || url.startsWith(Pages.BASE) || !isWeb(url)) return;
                           addHistory(t.title, url);
                           if (t.desktop) v.evaluateJavascript(DESKTOP_JS, null);
-                          if (sNoPay) v.evaluateJavascript(PAY_JS, null);
-                          if (sAds) v.evaluateJavascript(AD_JS, null);
+                          if (sNoPay && !off(hostOfUrl(url))) v.evaluateJavascript(PAY_JS, null);
+                          if (sAds && !relaxed(hostOfUrl(url))) v.evaluateJavascript(AD_JS, null);
                           v.evaluateJavascript(SCAN_JS, new ValueCallback<String>() {
                               @Override public void onReceiveValue(String value) { analyze(t, value); }
                           });
@@ -1774,6 +1790,18 @@ jobs:
                       }
                   });
                   divider(box);
+                  final String curHost = cur == null ? "" : regDomain(hostOfUrl(cur.url));
+                  if (!curHost.isEmpty() && !curHost.equals(Pages.HOST)) {
+                      final boolean isOff = siteOff.contains(curHost);
+                      menuRow(box, R.drawable.ic_shield, S.t(isOff ? "site_on" : "site_off"), new Runnable() {
+                          @Override public void run() {
+                              if (isOff) siteOff.remove(curHost); else siteOff.add(curHost);
+                              prefs.edit().putStringSet("siteoff", new HashSet<String>(siteOff)).apply();
+                              toast(S.t(isOff ? "site_on_done" : "site_off_done").replace("{h}", curHost));
+                              if (cur != null) { applySettings(cur.web, cur); cur.web.reload(); }
+                          }
+                      });
+                  }
                   menuRow(box, R.drawable.ic_shield, S.t("report_site"), new Runnable() {
                       @Override public void run() { showReport(); }
                   });
@@ -2536,6 +2564,10 @@ jobs:
                   p("close", "Close", "إغلاق", "Fermer");
                   p("yes", "Yes", "نعم", "Oui");
                   p("report_site", "Report this site", "الإبلاغ عن هذا الموقع", "Signaler ce site");
+                  p("site_off", "Allow this site (protections off)", "السماح بهذا الموقع (إيقاف الحماية)", "Autoriser ce site (protections off)");
+                  p("site_on", "Protect this site again", "تفعيل الحماية لهذا الموقع من جديد", "Protéger à nouveau ce site");
+                  p("site_off_done", "Protections are off for {h}", "تم إيقاف الحماية لـ {h}", "Protections désactivées pour {h}");
+                  p("site_on_done", "Protections are back on for {h}", "تم تفعيل الحماية لـ {h}", "Protections réactivées pour {h}");
                   p("report_title", "What are you reporting?", "ماذا تريد أن تبلّغ؟", "Que signalez-vous ?");
                   p("cat_phishing", "Phishing / Scam", "احتيال / تصيّد", "Hameçonnage / Arnaque");
                   p("cat_adult", "Adult content", "محتوى إباحي", "Contenu adulte");
