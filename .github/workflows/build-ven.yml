@@ -67,8 +67,8 @@ jobs:
                   applicationId 'app.ven.browser'
                   minSdk 26
                   targetSdk 34
-                  versionCode 4
-                  versionName '1.3'
+                  versionCode 7
+                  versionName '1.6'
               }
 
               compileOptions {
@@ -112,6 +112,12 @@ jobs:
                           <category android:name="android.intent.category.BROWSABLE" />
                           <data android:scheme="http" />
                           <data android:scheme="https" />
+                      </intent-filter>
+                      <intent-filter>
+                          <action android:name="android.intent.action.VIEW" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.BROWSABLE" />
+                          <data android:scheme="ven" android:host="auth" />
                       </intent-filter>
                   </activity>
               </application>
@@ -231,22 +237,39 @@ jobs:
                       + "document.addEventListener('submit',function(ev){var f=ev.target;if(f&&f.querySelector&&f.querySelector(sel)){ev.preventDefault();ev.stopPropagation();}},true);"
                       + "}catch(e){}})();";
 
-              static final String AD_JS = "(function(){if(window.__sgAd)return;window.__sgAd=1;"
-                      + "var s=document.createElement('style');s.textContent='"
-                      + "ins.adsbygoogle,.adsbygoogle,[id^=google_ads],[id^=div-gpt-ad],[id^=aswift],"
-                      + "iframe[src*=doubleclick],iframe[src*=googlesyndication],iframe[src*=\"/ads/\"],iframe[src*=adsterra],"
-                      + "a[href*=\"doubleclick.net\"],[class*=ad-banner],[class*=ad-container],[class*=adsbox],[class*=popup-ad],"
-                      + "[class*=banner-ad],[id*=ad-container],[class~=advert],[class~=advertisement]{display:none!important}';"
-                      + "(document.head||document.documentElement).appendChild(s);"
-                      + "function sweep(){try{var w=innerWidth,h=innerHeight;var pts=[[w/2,h/2],[w/2,h/4],[w/2,3*h/4]];"
-                      + "for(var i=0;i<pts.length;i++){var e=document.elementFromPoint(pts[i][0],pts[i][1]);"
-                      + "if(!e||e===document.body||e===document.documentElement)continue;"
-                      + "var cs=getComputedStyle(e);if(cs.position==='fixed'||cs.position==='absolute'){"
-                      + "var r=e.getBoundingClientRect();var big=r.width>=w*0.9&&r.height>=h*0.9;"
-                      + "var tr=parseFloat(cs.opacity)<0.1||cs.backgroundColor==='rgba(0, 0, 0, 0)'||cs.backgroundColor==='transparent';"
-                      + "var em=(e.innerText||'').trim().length===0&&e.querySelectorAll('input,button,video,img').length===0;"
-                      + "if(big&&tr&&em){e.style.setProperty('pointer-events','none','important');}}}}catch(x){}}"
-                      + "var n=0;var iv=setInterval(function(){sweep();if(++n>12)clearInterval(iv);},800);})();";
+              static final String AD_JS = "(function(){if(window.__sgAd)return;window.__sgAd=1;\n"
+                      + "var st=document.createElement('style');st.textContent='ins.adsbygoogle,.adsbygoogle,[id^=google_ads],[id^=div-gpt-ad],[id^=aswift],iframe[src*=doubleclick],iframe[src*=googlesyndication],iframe[src*=\"/ads/\"],iframe[src*=adsterra],a[href*=\"doubleclick.net\"],[class*=ad-banner],[class*=ad-container],[class*=adsbox],[class*=popup-ad],[class*=banner-ad],[id*=ad-container],[class~=advert],[class~=advertisement]{display:none!important}';\n"
+                      + "(document.head||document.documentElement).appendChild(st);\n"
+                      + "var KW=/(casino|jackpot|1xbet|melbet|mostbet|1win|linebet|betwinner|parimatch|22bet|pin-?up|bet365|betway|megapari|stake\\.com|roulette|free ?spins?|promo ?code|sportsbook|betting|\\bbet\\b)/i;\n"
+                      + "var OKF=/(captcha|turnstile|cloudflare|gstatic|google\\.com|discord|youtube|stripe|paypal)/i;\n"
+                      + "function rg(h){var p=(h||'').split('.');return p.slice(-2).join('.');}\n"
+                      + "var me=rg(location.hostname);\n"
+                      + "function hostOf(u){try{return new URL(u,location.href).hostname;}catch(e){return '';}}\n"
+                      + "function adLike(n){\n"
+                      + "var t=(n.innerText||'');if(t.length>1500)return false;\n"
+                      + "var l=n.querySelectorAll('a[href],img,iframe');\n"
+                      + "for(var i=0;i<l.length&&i<60;i++){var e=l[i];var u=e.getAttribute('href')||e.getAttribute('src')||'';t+=' '+u+' '+(e.getAttribute('alt')||'');\n"
+                      + "if(e.tagName==='IFRAME'){var h=hostOf(u);if(h&&rg(h)!==me&&!OKF.test(h))return true;}}\n"
+                      + "return KW.test(t);}\n"
+                      + "function hideBackdrops(){var l=document.querySelectorAll('body > div,body > section');var w=innerWidth,h=innerHeight;\n"
+                      + "for(var i=0;i<l.length;i++){var n=l[i];var cs=getComputedStyle(n);if(cs.position!=='fixed')continue;var r=n.getBoundingClientRect();\n"
+                      + "if(r.width>=w*0.9&&r.height>=h*0.9&&(n.innerText||'').trim().length===0&&n.querySelectorAll('input,button,video,img,iframe').length===0){n.style.setProperty('display','none','important');}}\n"
+                      + "document.documentElement.style.setProperty('overflow','auto','important');}\n"
+                      + "function sweep(){try{var w=innerWidth,h=innerHeight;var pts=[[.5,.5],[.5,.25],[.5,.75],[.25,.5],[.75,.5],[.5,.1],[.5,.9]];\n"
+                      + "for(var i=0;i<pts.length;i++){var e=document.elementFromPoint(w*pts[i][0],h*pts[i][1]);\n"
+                      + "if(!e||e===document.body||e===document.documentElement)continue;\n"
+                      + "var n=e;for(var d=0;n&&n!==document.body&&n!==document.documentElement&&d<14;d++,n=n.parentElement){\n"
+                      + "var cs=getComputedStyle(n);\n"
+                      + "if(cs.position==='fixed'||cs.position==='absolute'||cs.position==='sticky'){\n"
+                      + "var r=n.getBoundingClientRect();\n"
+                      + "if(r.width>=w*0.55&&r.height>=h*0.2){\n"
+                      + "if(adLike(n)){n.style.setProperty('display','none','important');hideBackdrops();break;}\n"
+                      + "var tr=parseFloat(cs.opacity)<0.1||cs.backgroundColor==='rgba(0, 0, 0, 0)'||cs.backgroundColor==='transparent';\n"
+                      + "var em=(n.innerText||'').trim().length===0&&n.querySelectorAll('input,button,video,img').length===0;\n"
+                      + "if(r.width>=w*0.9&&r.height>=h*0.9&&tr&&em){n.style.setProperty('pointer-events','none','important');}}}}}}catch(x){}}\n"
+                      + "var q=0;function sch(){if(q)return;q=1;setTimeout(function(){q=0;sweep();},400);}\n"
+                      + "sweep();var mo=new MutationObserver(sch);mo.observe(document.documentElement,{childList:true,subtree:true});\n"
+                      + "var n=0;var iv=setInterval(function(){sweep();if(++n>60){clearInterval(iv);mo.disconnect();}},1500);})();";
 
               static final String SCAN_JS = "(function(){var t=((document.body&&document.body.innerText)||'').toLowerCase().slice(0,20000);"
                       + "var pw=!!document.querySelector('input[type=password]');"
@@ -274,7 +297,7 @@ jobs:
               Tab cur;
               FrameLayout root, webHolder;
               EditText urlBox, findBox;
-              ImageView secIcon, btnReload;
+              ImageView secIcon, btnReload, btnBack, btnFwd;
               TextView secLabel, tabCount, bannerText;
               ProgressBar progressBar;
               LinearLayout banner, findBar;
@@ -294,6 +317,44 @@ jobs:
                   return siteOff.contains(regDomain(host.toLowerCase()));
               }
               /** trusted big sites (Discord, Google, ...) or sites the user allowed: no page scripts / redirect / cookie limits */
+              /** ad blocker runs on this page? (off on link-shortener / key sites that refuse to work with it) */
+              boolean adsOn(String pageUrl) {
+                  String h = hostOfUrl(pageUrl);
+                  return sAds && !relaxed(h) && (sOwner || !Shield.adOff(h));   // the owner (logged in) keeps the ad blocker on everywhere
+              }
+
+              boolean sOwner;
+              long ownerChecked;
+
+              /** asks the site if the Discord login inside Ven belongs to the bot owner */
+              void checkOwner() {
+                  ownerChecked = System.currentTimeMillis();
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          try {
+                              String ck = CookieManager.getInstance().getCookie("https://ticoo.wispbyte.org");
+                              boolean own = false;
+                              if (ck != null && !ck.isEmpty()) {
+                                  HttpURLConnection con = (HttpURLConnection) new URL("https://ticoo.wispbyte.org/ven/owner/status").openConnection();
+                                  con.setConnectTimeout(8000);
+                                  con.setReadTimeout(8000);
+                                  con.setRequestProperty("Cookie", ck);
+                                  if (con.getResponseCode() != 200) { con.disconnect(); return; }   // keep the old value
+                                  ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                                  InputStream in = con.getInputStream();
+                                  byte[] buf = new byte[1024];
+                                  int n;
+                                  while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                                  in.close();
+                                  con.disconnect();
+                                  own = bo.toString("UTF-8").contains("\"owner\":true");
+                              }
+                              prefs.edit().putBoolean("is_owner", own).apply();
+                              sOwner = own;
+                          } catch (Exception e) { /* offline: keep the old value */ }
+                      }
+                  }).start();
+              }
               boolean relaxed(String host) {
                   return host != null && !host.isEmpty() && (off(host) || Shield.isTrusted(host.toLowerCase()));
               }
@@ -326,6 +387,8 @@ jobs:
                   getWindow().setStatusBarColor(C_BAR);
                   getWindow().setNavigationBarColor(C_BG);
                   buildUi();
+                  checkOwner();
+                  syncNow(false);
                   Shield.loadOwner(this);   // tiny file: the owner lists and icons are ready before the first page
                   new Thread(new Runnable() {
                       @Override public void run() {
@@ -358,6 +421,7 @@ jobs:
               protected void onNewIntent(Intent intent) {
                   super.onNewIntent(intent);
                   setIntent(intent);
+                  if (handleAuth(intent)) return;
                   Uri d = intent.getData();
                   if (d != null) newTab(d.toString(), true);
               }
@@ -366,6 +430,7 @@ jobs:
               protected void onPause() {
                   super.onPause();
                   saveTabs();
+                  if (Account.signedIn(prefs)) new Thread(new Runnable() { @Override public void run() { Account.sync(prefs); } }).start();
               }
 
               @Override
@@ -415,6 +480,7 @@ jobs:
                   sNoDl = prefs.getBoolean("nodl", false);
                   sDarkWeb = prefs.getBoolean("darkweb", false);
                   sText = prefs.getInt("textsize", 100);
+                  sOwner = prefs.getBoolean("is_owner", false);
                   siteOff.clear();
                   siteOff.addAll(prefs.getStringSet("siteoff", new HashSet<String>()));
               }
@@ -513,7 +579,6 @@ jobs:
                   ImageView home = iconBtn(R.drawable.ic_home, new View.OnClickListener() {
                       @Override public void onClick(View v) { if (cur != null) { cur.typed = true; loadHome(cur); } }
                   });
-                  top.addView(home, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
                   LinearLayout pill = new LinearLayout(this);
                   pill.setOrientation(LinearLayout.HORIZONTAL);
@@ -593,7 +658,7 @@ jobs:
                   btnReload.setPadding(dp(8), dp(8), dp(8), dp(8));
                   pill.addView(btnReload, new LinearLayout.LayoutParams(dp(38), dp(38)));
                   LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, dp(44), 1f);
-                  plp.setMargins(dp(2), 0, dp(4), 0);
+                  plp.setMargins(dp(8), 0, dp(8), 0);
                   top.addView(pill, plp);
 
                   tabCount = new TextView(this);
@@ -615,13 +680,11 @@ jobs:
                   tabWrap.setOnClickListener(new View.OnClickListener() {
                       @Override public void onClick(View v) { showTabs(); }
                   });
-                  top.addView(tabWrap, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
                   final ImageView more = iconBtn(R.drawable.ic_more, null);
                   more.setOnClickListener(new View.OnClickListener() {
                       @Override public void onClick(View v) { showMenu(more); }
                   });
-                  top.addView(more, new LinearLayout.LayoutParams(dp(42), dp(42)));
                   col.addView(top, new LinearLayout.LayoutParams(-1, -2));
 
                   progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -685,6 +748,25 @@ jobs:
                   sugScroll.setVisibility(View.GONE);
                   sugScroll.addView(sugList, new ViewGroup.LayoutParams(-1, -2));
                   webHolder.addView(sugScroll, new FrameLayout.LayoutParams(-1, -1));
+                  LinearLayout bottom = new LinearLayout(this);
+                  bottom.setOrientation(LinearLayout.HORIZONTAL);
+                  bottom.setGravity(Gravity.CENTER_VERTICAL);
+                  bottom.setBackgroundColor(C_BAR);
+                  bottom.setPadding(dp(4), dp(2), dp(4), dp(2));
+                  btnBack = iconBtn(R.drawable.ic_back, new View.OnClickListener() {
+                      @Override public void onClick(View v) {
+                          if (cur == null) return;
+                          if (goBackSmart(cur)) return;
+                          if (tabs.size() > 1) closeTab(cur);
+                          else if (cur.web.canGoBack()) loadHome(cur);
+                      }
+                  });
+                  btnFwd = iconBtn(R.drawable.ic_forward, new View.OnClickListener() {
+                      @Override public void onClick(View v) { if (cur != null && cur.web.canGoForward()) cur.web.goForward(); }
+                  });
+                  View[] hot = {btnBack, btnFwd, home, tabWrap, more};
+                  for (View hv : hot) bottom.addView(hv, new LinearLayout.LayoutParams(0, dp(46), 1f));
+                  col.addView(bottom, new LinearLayout.LayoutParams(-1, -2));
                   root.addView(col, new FrameLayout.LayoutParams(-1, -1));
                   setContentView(root);
               }
@@ -921,6 +1003,10 @@ jobs:
                   else { secIcon.setImageResource(R.drawable.ic_info); secIcon.setColorFilter(C_WARN); }
                   secLabel.setVisibility(st == 4 ? View.VISIBLE : View.GONE);
                   if (!urlBox.hasFocus()) urlBox.setText(info[0]);
+                  if (btnBack != null) {
+                      btnBack.setAlpha((backTarget(cur) != 0 || tabs.size() > 1 || cur.web.canGoBack()) ? 1f : 0.35f);
+                      btnFwd.setAlpha(cur.web.canGoForward() ? 1f : 0.35f);
+                  }
                   updateProgress();
               }
 
@@ -1005,7 +1091,45 @@ jobs:
                   if (ci < 0 || ci >= tabs.size()) ci = 0;
                   switchTo(tabs.get(ci));
                   Uri d = intent == null ? null : intent.getData();
-                  if (d != null) newTab(d.toString(), true);
+                  if (d != null && !"ven".equals(d.getScheme())) newTab(d.toString(), true);
+                  handleAuth(intent);
+              }
+
+              // ================= account (Google / Discord) =================
+              /** the sign-in page sends the browser back to ven://auth?code=... */
+              boolean handleAuth(Intent intent) {
+                  Uri d = intent == null ? null : intent.getData();
+                  if (d == null || !"ven".equals(d.getScheme())) return false;
+                  final String code = d.getQueryParameter("code");
+                  if (code == null || code.isEmpty()) return true;
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          final boolean ok = Account.exchange(prefs, code);
+                          if (ok) Account.sync(prefs);
+                          ui.post(new Runnable() {
+                              @Override public void run() {
+                                  toast(S.t(ok ? "acc_in_ok" : "acc_in_fail"));
+                                  if (ok) { loadSettings(); applyAllSettings(); }
+                              }
+                          });
+                      }
+                  }).start();
+                  return true;
+              }
+
+              void syncNow(final boolean loud) {
+                  if (!Account.signedIn(prefs)) return;
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          final int r = Account.sync(prefs);
+                          ui.post(new Runnable() {
+                              @Override public void run() {
+                                  if (r == 1) { loadSettings(); applyAllSettings(); }
+                                  if (loud || r == -1) toast(S.t(r == 1 ? "acc_sync_ok" : "acc_fail"));
+                              }
+                          });
+                      }
+                  }).start();
               }
 
               // ================= navigation =================
@@ -1057,9 +1181,10 @@ jobs:
               boolean blockCheck(Tab t, String url, String host) {
                   if (!(sAnti || sNsfw)) return false;
                   Shield.Result r = Shield.check(host, url, sNsfw);
-                  if (!r.hard || allowed.contains(host) || off(host)) return false;
+                  if (!r.hard || allowed.contains(host)) return false;
                   boolean adult = "adult".equals(r.category);
                   if (adult ? !sNsfw : !sAnti) return false;
+                  if (off(host) && !adult) return false;
                   threatsBlocked++;
                   load(t, Pages.BASE + "blocked?u=" + Pages.enc(url));
                   return true;
@@ -1082,7 +1207,7 @@ jobs:
                       String clean = stripTracking(url);
                       if (!clean.equals(url)) { t.web.loadUrl(clean); return true; }
                   }
-                  if (sAds && !typed && Shield.isAd(host)) {
+                  if (!typed && adsOn(t.url) && Shield.isAd(host)) {
                       adsBlocked++;
                       toast(S.t("ad_redirect"));
                       if (t.popup) closeLater(t);
@@ -1146,7 +1271,9 @@ jobs:
                   Uri cp = Uri.parse(cu);
                   String ch = cp.getHost() == null ? "" : cp.getHost().toLowerCase();
                   if (regDomain(ch).equals(regDomain(nh)) || Shield.isTrusted(nh) || relaxed(ch)) return false;
-                  toast(S.t("redirect_blocked").replace("{h}", nh));
+                  Tab nt = newTab(nu.toString(), false);     // the redirect gets its own tab; this page stays where it is
+                  nt.opener = t;
+                  toast(S.t("redirect_tab").replace("{h}", nh));
                   return true;
               }
 
@@ -1333,7 +1460,7 @@ jobs:
                               return new WebResourceResponse("text/html", "utf-8", 200, "OK", new HashMap<String, String>(),
                                       new ByteArrayInputStream(Pages.blocked(u.toString(), pr, false).getBytes(StandardCharsets.UTF_8)));
                           }
-                          if (sAds && !req.isForMainFrame() && host != null && !relaxed(hostOfUrl(t.url)) && Shield.isAd(host.toLowerCase())) {
+                          if (host != null && !req.isForMainFrame() && adsOn(t.url) && Shield.isAd(host.toLowerCase())) {
                               adsBlocked++;
                               return empty(200);
                           }
@@ -1382,9 +1509,10 @@ jobs:
                           if (t == cur) updateUrlBar();
                           if (url == null || url.startsWith(Pages.BASE) || !isWeb(url)) return;
                           addHistory(t.title, url);
+                          if (hostOfUrl(url).equals("ticoo.wispbyte.org") && System.currentTimeMillis() - ownerChecked > 4000) checkOwner();
                           if (t.desktop) v.evaluateJavascript(DESKTOP_JS, null);
                           if (sNoPay && !off(hostOfUrl(url))) v.evaluateJavascript(PAY_JS, null);
-                          if (sAds && !relaxed(hostOfUrl(url))) v.evaluateJavascript(AD_JS, null);
+                          if (adsOn(url)) v.evaluateJavascript(AD_JS, null);
                           v.evaluateJavascript(SCAN_JS, new ValueCallback<String>() {
                               @Override public void onReceiveValue(String value) { analyze(t, value); }
                           });
@@ -1674,47 +1802,62 @@ jobs:
                   } catch (Exception e) { /* ignore */ }
               }
 
+              void cell(LinearLayout row, int icon, String label, boolean active, final Runnable r) {
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setGravity(Gravity.CENTER_HORIZONTAL);
+                  c.setPadding(dp(2), dp(10), dp(2), dp(10));
+                  c.setBackground(ripple());
+                  ImageView iv = new ImageView(this);
+                  iv.setImageResource(icon);
+                  iv.setColorFilter(active ? C_ACCENT : C_TEXT);
+                  c.addView(iv, new LinearLayout.LayoutParams(dp(26), dp(26)));
+                  TextView tv = text(label, 11, active ? C_ACCENT : C_TEXT);
+                  tv.setGravity(Gravity.CENTER);
+                  tv.setMaxLines(2);
+                  tv.setPadding(0, dp(5), 0, 0);
+                  c.addView(tv, new LinearLayout.LayoutParams(-1, -2));
+                  c.setOnClickListener(new View.OnClickListener() {
+                      @Override public void onClick(View v) {
+                          if (menu != null) menu.dismiss();
+                          r.run();
+                      }
+                  });
+                  row.addView(c, new LinearLayout.LayoutParams(0, -2, 1f));
+              }
+
+              LinearLayout gridRow(LinearLayout box) {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+                  box.addView(row, new LinearLayout.LayoutParams(-1, -2));
+                  return row;
+              }
+
+              /** quick on/off switch from the menu */
+              void flip(String key, boolean def, String label) {
+                  boolean now = !prefs.getBoolean(key, def);
+                  prefs.edit().putBoolean(key, now).apply();
+                  loadSettings();
+                  applyAllSettings();
+                  toast(label + ": " + (now ? "ON" : "OFF"));
+              }
+
               void showMenu(View anchor) {
                   if (cur == null) return;
                   final LinearLayout box = new LinearLayout(this);
                   box.setOrientation(LinearLayout.VERTICAL);
                   box.setBackground(rounded(C_SHEET, 16));
-                  box.setPadding(0, dp(6), 0, dp(6));
-                  box.setLayoutDirection(S.rtl() ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+                  box.setPadding(dp(6), dp(10), dp(6), dp(14));
+                  box.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
 
-                  LinearLayout row = new LinearLayout(this);
-                  row.setOrientation(LinearLayout.HORIZONTAL);
-                  row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-                  row.setGravity(Gravity.CENTER);
-                  ImageView back = iconBtn(R.drawable.ic_back, new View.OnClickListener() {
-                      @Override public void onClick(View v) { menu.dismiss(); if (!goBackSmart(cur) && cur.web.canGoBack()) loadHome(cur); }
-                  });
-                  back.setAlpha(cur.web.canGoBack() ? 1f : 0.35f);
-                  ImageView fwd = iconBtn(R.drawable.ic_forward, new View.OnClickListener() {
-                      @Override public void onClick(View v) { menu.dismiss(); if (cur.web.canGoForward()) cur.web.goForward(); }
-                  });
-                  fwd.setAlpha(cur.web.canGoForward() ? 1f : 0.35f);
                   String ru = realUrl();
                   boolean bm = ru != null && isBookmarked(ru);
-                  ImageView star = iconBtn(bm ? R.drawable.ic_star : R.drawable.ic_star_border, new View.OnClickListener() {
-                      @Override public void onClick(View v) { menu.dismiss(); toggleBookmark(); }
-                  });
-                  ImageView rl = iconBtn(R.drawable.ic_refresh, new View.OnClickListener() {
-                      @Override public void onClick(View v) { menu.dismiss(); cur.web.reload(); }
-                  });
-                  ImageView sh = iconBtn(R.drawable.ic_share, new View.OnClickListener() {
-                      @Override public void onClick(View v) {
-                          menu.dismiss();
-                          String u = realUrl();
-                          if (u == null) toast(S.t("no_page")); else shareText(u);
-                      }
-                  });
-                  View[] btns = {back, fwd, star, rl, sh};
-                  for (View b : btns) row.addView(b, new LinearLayout.LayoutParams(0, dp(46), 1f));
-                  box.addView(row, new LinearLayout.LayoutParams(-1, -2));
-                  divider(box);
+                  final String curHost = regDomain(hostOfUrl(cur.url));
+                  final boolean isOff = siteOff.contains(curHost);
 
-                  menuRow(box, R.drawable.ic_plus, S.t("new_tab"), new Runnable() {
+                  LinearLayout r1 = gridRow(box);
+                  cell(r1, R.drawable.ic_plus, S.t("new_tab"), false, new Runnable() {
                       @Override public void run() {
                           newTab(null, true);
                           urlBox.requestFocus();
@@ -1722,46 +1865,37 @@ jobs:
                           if (im != null) im.showSoftInput(urlBox, 0);
                       }
                   });
-                  menuRow(box, R.drawable.ic_star, S.t("bookmarks"), new Runnable() {
+                  cell(r1, R.drawable.ic_star, S.t("bookmarks"), false, new Runnable() {
                       @Override public void run() { showList(S.t("bookmarks"), "bm"); }
                   });
-                  menuRow(box, R.drawable.ic_history, S.t("history"), new Runnable() {
+                  cell(r1, R.drawable.ic_history, S.t("history"), false, new Runnable() {
                       @Override public void run() { showList(S.t("history"), "hist"); }
                   });
-                  menuRow(box, R.drawable.ic_download, S.t("downloads"), new Runnable() {
+                  cell(r1, R.drawable.ic_download, S.t("downloads"), false, new Runnable() {
                       @Override public void run() {
                           try { startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)); } catch (Exception e) { /* ignore */ }
                       }
                   });
-                  divider(box);
-
-                  LinearLayout dRow = new LinearLayout(this);
-                  dRow.setOrientation(LinearLayout.HORIZONTAL);
-                  dRow.setGravity(Gravity.CENTER_VERTICAL);
-                  dRow.setPadding(dp(16), dp(12), dp(16), dp(12));
-                  ImageView dIcon = new ImageView(this);
-                  dIcon.setImageResource(R.drawable.ic_desktop);
-                  dIcon.setColorFilter(C_TEXT);
-                  dRow.addView(dIcon, new LinearLayout.LayoutParams(dp(22), dp(22)));
-                  TextView dTxt = text(S.t("desktop_site"), 15, C_TEXT);
-                  dTxt.setPadding(dp(16), 0, dp(16), 0);
-                  dRow.addView(dTxt, new LinearLayout.LayoutParams(0, -2, 1f));
-                  final android.widget.CheckBox cb = new android.widget.CheckBox(this);
-                  cb.setChecked(cur.desktop);
-                  cb.setClickable(false);
-                  dRow.addView(cb);
-                  dRow.setOnClickListener(new View.OnClickListener() {
-                      @Override public void onClick(View v) {
-                          menu.dismiss();
-                          cur.desktop = !cur.desktop;
-                          applySettings(cur.web, cur);
-                          String ru = realUrl();
-                          if (ru != null) cur.web.loadUrl(ru); else cur.web.reload();   // a fresh request, so the site sees the new user agent
+                  cell(r1, R.drawable.ic_share, S.t("share"), false, new Runnable() {
+                      @Override public void run() {
+                          String u = realUrl();
+                          if (u == null) toast(S.t("no_page")); else shareText(u);
                       }
                   });
-                  box.addView(dRow, new LinearLayout.LayoutParams(-1, -2));
 
-                  menuRow(box, R.drawable.ic_search, S.t("find"), new Runnable() {
+                  LinearLayout r2 = gridRow(box);
+                  cell(r2, bm ? R.drawable.ic_star : R.drawable.ic_star_border, S.t("q_bm"), bm, new Runnable() {
+                      @Override public void run() { toggleBookmark(); }
+                  });
+                  cell(r2, R.drawable.ic_desktop, S.t("desktop_site"), cur.desktop, new Runnable() {
+                      @Override public void run() {
+                          cur.desktop = !cur.desktop;
+                          applySettings(cur.web, cur);
+                          String u = realUrl();
+                          if (u != null) cur.web.loadUrl(u); else cur.web.reload();   // a fresh request, so the site sees the new user agent
+                      }
+                  });
+                  cell(r2, R.drawable.ic_search, S.t("find"), false, new Runnable() {
                       @Override public void run() {
                           findBar.setVisibility(View.VISIBLE);
                           findBox.setText("");
@@ -1770,16 +1904,55 @@ jobs:
                           if (im != null) im.showSoftInput(findBox, 0);
                       }
                   });
-                  menuRow(box, R.drawable.ic_code, S.t("view_source"), new Runnable() {
+                  cell(r2, R.drawable.ic_code, S.t("view_source"), false, new Runnable() {
                       @Override public void run() { showSource(realUrl()); }
                   });
-                  menuRow(box, R.drawable.ic_copy, S.t("copy_link"), new Runnable() {
+                  cell(r2, R.drawable.ic_copy, S.t("copy_link"), false, new Runnable() {
                       @Override public void run() {
                           String u = realUrl();
                           if (u == null) toast(S.t("no_page")); else copyText(u);
                       }
                   });
-                  menuRow(box, R.drawable.ic_open, S.t("open_ext"), new Runnable() {
+
+                  LinearLayout r3 = gridRow(box);
+                  cell(r3, R.drawable.ic_shield, S.t("q_ads"), sAds, new Runnable() {
+                      @Override public void run() { flip("ads", true, S.t("q_ads")); }
+                  });
+                  cell(r3, R.drawable.ic_fill, S.t("q_night"), sDarkWeb, new Runnable() {
+                      @Override public void run() { flip("darkweb", false, S.t("q_night")); }
+                  });
+                  cell(r3, R.drawable.ic_close, S.t("q_popups"), sPopups, new Runnable() {
+                      @Override public void run() { flip("popups", true, S.t("q_popups")); }
+                  });
+                  cell(r3, R.drawable.ic_open, S.t("q_redirect"), sNoRedirect, new Runnable() {
+                      @Override public void run() { flip("noredir", true, S.t("q_redirect")); }
+                  });
+                  cell(r3, R.drawable.ic_lock, S.t("q_pay"), sNoPay, new Runnable() {
+                      @Override public void run() { flip("nopay", false, S.t("q_pay")); }
+                  });
+
+                  LinearLayout r4 = gridRow(box);
+                  cell(r4, R.drawable.ic_tune, S.t("q_text") + " " + sText + "%", false, new Runnable() {
+                      @Override public void run() {
+                          int[] sz = {85, 100, 120, 145};
+                          int next = sz[0];
+                          for (int i = 0; i < sz.length; i++) if (sz[i] == sText) { next = sz[(i + 1) % sz.length]; break; }
+                          prefs.edit().putInt("textsize", next).apply();
+                          loadSettings();
+                          applyAllSettings();
+                          toast(S.t("q_text") + ": " + next + "%");
+                      }
+                  });
+                  cell(r4, R.drawable.ic_globe, S.t(isOff ? "q_site_on" : "q_site_off"), isOff, new Runnable() {
+                      @Override public void run() {
+                          if (curHost.isEmpty() || curHost.equals(Pages.HOST)) return;
+                          if (isOff) siteOff.remove(curHost); else siteOff.add(curHost);
+                          prefs.edit().putStringSet("siteoff", new HashSet<String>(siteOff)).apply();
+                          toast(S.t(isOff ? "site_on_done" : "site_off_done").replace("{h}", curHost));
+                          if (cur != null) { applySettings(cur.web, cur); cur.web.reload(); }
+                      }
+                  });
+                  cell(r4, R.drawable.ic_open, S.t("open_ext"), false, new Runnable() {
                       @Override public void run() {
                           String u = realUrl();
                           if (u == null) { toast(S.t("no_page")); return; }
@@ -1789,38 +1962,25 @@ jobs:
                           try { startActivity(ch); } catch (Exception e) { /* ignore */ }
                       }
                   });
-                  divider(box);
-                  final String curHost = cur == null ? "" : regDomain(hostOfUrl(cur.url));
-                  if (!curHost.isEmpty() && !curHost.equals(Pages.HOST)) {
-                      final boolean isOff = siteOff.contains(curHost);
-                      menuRow(box, R.drawable.ic_shield, S.t(isOff ? "site_on" : "site_off"), new Runnable() {
-                          @Override public void run() {
-                              if (isOff) siteOff.remove(curHost); else siteOff.add(curHost);
-                              prefs.edit().putStringSet("siteoff", new HashSet<String>(siteOff)).apply();
-                              toast(S.t(isOff ? "site_on_done" : "site_off_done").replace("{h}", curHost));
-                              if (cur != null) { applySettings(cur.web, cur); cur.web.reload(); }
-                          }
-                      });
-                  }
-                  menuRow(box, R.drawable.ic_shield, S.t("report_site"), new Runnable() {
+                  cell(r4, R.drawable.ic_shield, S.t("report_site"), false, new Runnable() {
                       @Override public void run() { showReport(); }
                   });
-                  menuRow(box, R.drawable.ic_tune, S.t("settings"), new Runnable() {
+                  cell(r4, R.drawable.ic_tune, S.t("settings"), false, new Runnable() {
                       @Override public void run() { showSettings(); }
                   });
 
                   ScrollView sv = new ScrollView(this);
                   sv.addView(box);
-                  int w = dp(280);
+                  int w = getResources().getDisplayMetrics().widthPixels;
                   box.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
                           View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-                  int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.82f);
+                  int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.75f);
                   int h = Math.min(box.getMeasuredHeight(), maxH);
                   menu = new PopupWindow(sv, w, h, true);
                   menu.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                   menu.setOutsideTouchable(true);
-                  menu.setElevation(dp(10));
-                  menu.showAsDropDown(anchor, anchor.getWidth() - w, -anchor.getHeight());
+                  menu.setElevation(dp(12));
+                  menu.showAtLocation(root, Gravity.BOTTOM, 0, 0);
               }
 
               // ================= dialogs =================
@@ -2239,6 +2399,32 @@ jobs:
                   sv.addView(p);
                   sh[0].addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
 
+                  section(p, S.t("acc_title"));
+                  if (!Account.signedIn(prefs)) {
+                      valueRow(p, S.t("acc_google"), S.t("acc_d"), new View.OnClickListener() {
+                          @Override public void onClick(View v) { d.dismiss(); Account.startLogin(MainActivity.this, prefs, "google"); }
+                      });
+                      valueRow(p, S.t("acc_discord"), S.t("acc_d"), new View.OnClickListener() {
+                          @Override public void onClick(View v) { d.dismiss(); Account.startLogin(MainActivity.this, prefs, "discord"); }
+                      });
+                  } else {
+                      final boolean hg = prefs.getBoolean("acc_g", false), hd = prefs.getBoolean("acc_d", false);
+                      valueRow(p, S.t("acc_signed").replace("{n}", prefs.getString("acc_name", "")),
+                              S.t("acc_linked").replace("{l}", (hg ? "Google " : "") + (hd ? "Discord" : "")).trim(), null);
+                      if (!hg) valueRow(p, S.t("acc_link_google"), S.t("acc_d"), new View.OnClickListener() {
+                          @Override public void onClick(View v) { d.dismiss(); Account.startLogin(MainActivity.this, prefs, "google"); }
+                      });
+                      if (!hd) valueRow(p, S.t("acc_link_discord"), S.t("acc_d"), new View.OnClickListener() {
+                          @Override public void onClick(View v) { d.dismiss(); Account.startLogin(MainActivity.this, prefs, "discord"); }
+                      });
+                      valueRow(p, S.t("acc_sync"), S.t("acc_d"), new View.OnClickListener() {
+                          @Override public void onClick(View v) { syncNow(true); }
+                      });
+                      valueRow(p, S.t("acc_out"), "", new View.OnClickListener() {
+                          @Override public void onClick(View v) { Account.signOut(prefs); d.dismiss(); showSettings(); }
+                      });
+                  }
+
                   section(p, S.t("set_protection"));
                   switchRow(p, S.t("set_antiscam"), S.t("set_antiscam_d"), "anti", true, null);
                   switchRow(p, S.t("set_adblock"), S.t("set_adblock_d"), "ads", true, null);
@@ -2568,6 +2754,30 @@ jobs:
                   p("site_on", "Protect this site again", "تفعيل الحماية لهذا الموقع من جديد", "Protéger à nouveau ce site");
                   p("site_off_done", "Protections are off for {h}", "تم إيقاف الحماية لـ {h}", "Protections désactivées pour {h}");
                   p("site_on_done", "Protections are back on for {h}", "تم تفعيل الحماية لـ {h}", "Protections réactivées pour {h}");
+                  p("redirect_tab", "Redirect to {h} opened in a new tab", "تم فتح إعادة التوجيه إلى {h} في تبويب جديد", "Redirection vers {h} ouverte dans un nouvel onglet");
+                  p("q_bm", "Bookmark", "إضافة للمفضلة", "Favori");
+                  p("q_ads", "Ad blocking", "حظر الإعلانات", "Bloc. pubs");
+                  p("q_night", "Night mode", "الوضع الليلي", "Mode nuit");
+                  p("q_popups", "Pop-ups", "النوافذ المنبثقة", "Pop-ups");
+                  p("q_redirect", "Redirects", "إعادة التوجيه", "Redirections");
+                  p("q_pay", "Payments", "منع الدفع", "Paiements");
+                  p("q_text", "Text size", "حجم الخط", "Texte");
+                  p("q_site_off", "Allow site", "السماح بالموقع", "Autoriser");
+                  p("q_site_on", "Protect site", "حماية الموقع", "Protéger");
+                  p("acc_title", "Account", "الحساب", "Compte");
+                  p("acc_google", "Sign in with Google", "تسجيل الدخول بجوجل", "Se connecter avec Google");
+                  p("acc_discord", "Sign in with Discord", "تسجيل الدخول بديسكورد", "Se connecter avec Discord");
+                  p("acc_d", "Saves your bookmarks, history and settings and brings them to any phone", "يحفظ المفضلة والتاريخ والإعدادات ويرجعها في أي هاتف", "Sauvegarde vos favoris, historique et réglages sur tous vos téléphones");
+                  p("acc_signed", "Signed in: {n}", "مسجّل الدخول: {n}", "Connecté : {n}");
+                  p("acc_linked", "Linked: {l}", "المرتبط: {l}", "Lié : {l}");
+                  p("acc_link_google", "Link Google", "ربط حساب جوجل", "Lier Google");
+                  p("acc_link_discord", "Link Discord", "ربط حساب ديسكورد", "Lier Discord");
+                  p("acc_sync", "Sync now", "مزامنة الآن", "Synchroniser");
+                  p("acc_out", "Sign out", "تسجيل الخروج", "Se déconnecter");
+                  p("acc_in_ok", "Signed in. Your data is synced.", "تم تسجيل الدخول وتمت المزامنة", "Connecté. Données synchronisées.");
+                  p("acc_in_fail", "Sign-in failed. Try again.", "فشل تسجيل الدخول، حاول مجددا", "Échec de la connexion. Réessayez.");
+                  p("acc_sync_ok", "Synced", "تمت المزامنة", "Synchronisé");
+                  p("acc_fail", "Could not sync (check internet or sign in again)", "تعذرت المزامنة (تحقق من الإنترنت أو سجّل الدخول من جديد)", "Synchro impossible (vérifiez internet ou reconnectez-vous)");
                   p("report_title", "What are you reporting?", "ماذا تريد أن تبلّغ؟", "Que signalez-vous ?");
                   p("cat_phishing", "Phishing / Scam", "احتيال / تصيّد", "Hameçonnage / Arnaque");
                   p("cat_adult", "Adult content", "محتوى إباحي", "Contenu adulte");
@@ -2770,6 +2980,7 @@ jobs:
               private static volatile Set<String> oAdult = new HashSet<>();
               private static volatile Set<String> oAds = new HashSet<>();
               private static volatile Set<String> oTrust = new HashSet<>();
+              private static volatile Set<String> oAdOff = new HashSet<>();
               // image links that replace the emojis of the app (set in the Owner Panel)
               private static volatile java.util.Map<String, String> icons = new java.util.HashMap<>();
               private static volatile java.util.Map<String, String> iconData = new java.util.HashMap<>();   // key -> data: URI (from the disk cache)
@@ -2831,6 +3042,7 @@ jobs:
                       oAdult = jsonSet(o, "adult");
                       oAds = jsonSet(o, "ads");
                       oTrust = jsonSet(o, "trusted");
+                      oAdOff = jsonSet(o, "adoff");
                       java.util.HashMap<String, String> ic = new java.util.HashMap<>();
                       org.json.JSONObject io = o.optJSONObject("icons");
                       if (io != null) {
@@ -2991,6 +3203,14 @@ jobs:
                           || path.startsWith("/pay/") || path.startsWith("/purchase");
               }
 
+              // sites where the ad blocker stays off (shorteners / key systems that break with it). The owner can add more.
+              private static final String[] AD_OFF = {
+                      "lootlabs.gg", "loot-link.com", "lootlinks.co", "lootdest.com", "lootdest.org", "lootdest.info", "loot-links.com",
+                      "links-loot.com", "linkvertise.com", "link-to.net", "link-center.net", "link-target.net", "direct-link.net",
+                      "up-to-down.net", "link-hub.net", "shrinkme.io", "shrinkme.click", "shrinkearn.com", "work.ink", "top.gg"};
+
+              static boolean adOff(String host) { return host != null && !host.isEmpty() && (inArr(AD_OFF, host) || inSet(oAdOff, host)); }
+
               static boolean isTrusted(String host) { return host != null && (inArr(TRUSTED, host) || inSet(oTrust, host)); }
 
               static boolean isAd(String host) {
@@ -3109,6 +3329,172 @@ jobs:
                       r.hard = true; r.category = "unwanted"; r.flags.add(new String[]{"flag_unwanted", ""});
                   }
                   return r;
+              }
+          }
+          SGB_EOF
+          cat > sgb-android/app/src/main/java/app/scamguard/browser/Account.java <<'SGB_EOF'
+          package app.scamguard.browser;
+
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.ComponentName;
+          import android.net.Uri;
+
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
+          import java.util.HashSet;
+          import java.util.Set;
+          import java.util.UUID;
+
+          /** Ven account: sign in with Google or Discord, then bookmarks / history / settings follow you to every device. */
+          final class Account {
+              static final String BASE = "https://ticoo.wispbyte.org";
+              private static final String[] BOOL = {"anti", "ads", "popups", "nsfw", "https", "tp", "suggest", "noredir",
+                      "nopay", "strip", "nodl", "darkweb", "def_desktop"};
+
+              private Account() { }
+
+              static String token(SharedPreferences p) { return p.getString("acc_token", ""); }
+              static boolean signedIn(SharedPreferences p) { return !token(p).isEmpty(); }
+
+              static void signOut(SharedPreferences p) {
+                  p.edit().remove("acc_token").remove("acc_name").remove("acc_g").remove("acc_d").apply();
+              }
+
+              /** opens the sign-in page in the phone's own browser (Google refuses sign-in inside app web views) */
+              static void startLogin(Context c, SharedPreferences p, String provider) {
+                  try {
+                      String url = BASE + "/ven/auth/start?p=" + provider + "&t=" + URLEncoder.encode(token(p), "UTF-8");
+                      Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                      Intent ch = Intent.createChooser(i, "Sign in");
+                      ch.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new ComponentName[]{new ComponentName(c, MainActivity.class)});
+                      c.startActivity(ch);
+                  } catch (Exception e) { /* no browser */ }
+              }
+
+              private static String call(String method, String path, String token, String body) throws Exception {
+                  HttpURLConnection con = (HttpURLConnection) new URL(BASE + path).openConnection();
+                  con.setRequestMethod(method);
+                  con.setConnectTimeout(10000);
+                  con.setReadTimeout(15000);
+                  if (token != null && !token.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + token);
+                  if (body != null) {
+                      con.setDoOutput(true);
+                      con.setRequestProperty("Content-Type", "application/json");
+                      OutputStream os = con.getOutputStream();
+                      os.write(body.getBytes("UTF-8"));
+                      os.close();
+                  }
+                  int code = con.getResponseCode();
+                  InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream();
+                  ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                  if (in != null) {
+                      byte[] buf = new byte[8192];
+                      int n;
+                      while ((n = in.read(buf)) > 0 && bo.size() < 3 * 1024 * 1024) bo.write(buf, 0, n);
+                      in.close();
+                  }
+                  con.disconnect();
+                  if (code == 401) throw new SecurityException("auth");
+                  if (code >= 400) throw new Exception("http " + code);
+                  return bo.toString("UTF-8");
+              }
+
+              /** trades the one-time code from the ven://auth link for a long-lived token */
+              static boolean exchange(SharedPreferences p, String code) {
+                  try {
+                      String r = call("POST", "/ven/auth/exchange", null, new JSONObject().put("code", code).toString());
+                      JSONObject o = new JSONObject(r);
+                      String t = o.optString("token", "");
+                      if (t.isEmpty()) return false;
+                      p.edit().putString("acc_token", t).putString("acc_name", o.optString("name", ""))
+                              .putBoolean("acc_g", o.optBoolean("google")).putBoolean("acc_d", o.optBoolean("discord")).apply();
+                      return true;
+                  } catch (Exception e) { return false; }
+              }
+
+              private static String dev(SharedPreferences p) {
+                  String d = p.getString("dev_id", "");
+                  if (d.isEmpty()) { d = UUID.randomUUID().toString(); p.edit().putString("dev_id", d).apply(); }
+                  return d;
+              }
+
+              private static JSONObject localData(SharedPreferences p) throws Exception {
+                  JSONObject o = new JSONObject();
+                  o.put("bm", new JSONArray(p.getString("bm", "[]")));
+                  o.put("hist", new JSONArray(p.getString("hist", "[]")));
+                  JSONObject s = new JSONObject();
+                  for (String k : BOOL) if (p.contains(k)) s.put(k, p.getBoolean(k, false));
+                  s.put("engine", p.getString("engine", "google"));
+                  s.put("textsize", p.getInt("textsize", 100));
+                  JSONArray so = new JSONArray();
+                  for (String h : p.getStringSet("siteoff", new HashSet<String>())) so.put(h);
+                  s.put("siteoff", so);
+                  o.put("s", s);
+                  o.put("dev", dev(p));
+                  return o;
+              }
+
+              private static JSONArray union(JSONArray a, JSONArray b, int cap) {
+                  JSONArray out = new JSONArray();
+                  Set<String> seen = new HashSet<>();
+                  JSONArray[] both = {a, b};
+                  for (JSONArray src : both) {
+                      if (src == null) continue;
+                      for (int i = 0; i < src.length() && out.length() < cap; i++) {
+                          JSONObject o = src.optJSONObject(i);
+                          if (o == null) continue;
+                          String u = o.optString("u", "");
+                          if (u.isEmpty() || !seen.add(u)) continue;
+                          out.put(o);
+                      }
+                  }
+                  return out;
+              }
+
+              private static void apply(SharedPreferences p, JSONObject r) throws Exception {
+                  SharedPreferences.Editor e = p.edit();
+                  e.putString("bm", union(new JSONArray(p.getString("bm", "[]")), r.optJSONArray("bm"), 500).toString());
+                  e.putString("hist", union(new JSONArray(p.getString("hist", "[]")), r.optJSONArray("hist"), 300).toString());
+                  JSONObject s = r.optJSONObject("s");
+                  if (s != null) {
+                      if (!dev(p).equals(r.optString("dev"))) {      // another phone saved last: take its settings
+                          for (String k : BOOL) if (s.has(k)) e.putBoolean(k, s.optBoolean(k));
+                          if (s.has("engine")) e.putString("engine", s.optString("engine", "google"));
+                          if (s.has("textsize")) e.putInt("textsize", s.optInt("textsize", 100));
+                      }
+                      Set<String> so = new HashSet<>(p.getStringSet("siteoff", new HashSet<String>()));
+                      JSONArray ra = s.optJSONArray("siteoff");
+                      if (ra != null) for (int i = 0; i < ra.length(); i++) so.add(ra.optString(i));
+                      e.putStringSet("siteoff", so);
+                  }
+                  e.apply();
+              }
+
+              /** 1 = synced, 0 = failed (offline), -1 = the sign-in is no longer valid */
+              static int sync(SharedPreferences p) {
+                  String t = token(p);
+                  if (t.isEmpty()) return 0;
+                  try {
+                      JSONObject me = new JSONObject(call("GET", "/ven/sync", t, null));
+                      p.edit().putString("acc_name", me.optString("name", p.getString("acc_name", "")))
+                              .putBoolean("acc_g", me.optBoolean("google")).putBoolean("acc_d", me.optBoolean("discord")).apply();
+                      JSONObject rd = me.optJSONObject("data");
+                      if (rd != null && rd.length() > 0) apply(p, rd);
+                      call("PUT", "/ven/sync", t, new JSONObject().put("data", localData(p)).toString());
+                      return 1;
+                  } catch (SecurityException e) {
+                      signOut(p);
+                      return -1;
+                  } catch (Exception e) { return 0; }
               }
           }
           SGB_EOF
