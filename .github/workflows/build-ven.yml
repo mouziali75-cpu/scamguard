@@ -1707,6 +1707,8 @@ jobs:
                       public void onPageCommitVisible(WebView v, String url) {
                           if (t.desktop && isWeb(url) && !url.startsWith(Pages.BASE)) v.evaluateJavascript(DESKTOP_JS, null);
                           if (sNoPay && isWeb(url) && !url.startsWith(Pages.BASE) && !off(hostOfUrl(url))) v.evaluateJavascript(PAY_JS, null);
+                          injectPriv(v);
+                          runScripts(v, url, true);
                       }
 
                       @Override
@@ -1746,12 +1748,6 @@ jobs:
                           }
                           if (desc.contains("ERR_ABORTED")) return;
                           load(t, Pages.BASE + "error?u=" + Pages.enc(failing) + "&d=" + Pages.enc(desc));
-                      }
-
-                      @Override
-                      public void onPageCommitVisible(WebView v, String url) {
-                          injectPriv(v);
-                          runScripts(v, url, true);
                       }
 
                       @Override
