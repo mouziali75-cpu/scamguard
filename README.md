@@ -7,7 +7,7 @@
 
 A free, protection-focused Android browser built around ScamGuard's detection engine — featuring real-time anti-scam and NSFW blocking, ad and tracker filtering, payment and download guards, and multilingual support (English, Arabic, French).
 
-[![Download APK](https://img.shields.io/badge/Download-Ven%20APK%20(v1.2)-2EA44F?style=for-the-badge&logo=android&logoColor=white)](https://www.mediafire.com/file/6b4ilye0lpjpxmz/Ven.apk/file)
+[![Download APK](https://img.shields.io/badge/Download-Ven%20APK%20(v1.2)-2EA44F?style=for-the-badge&logo=android&logoColor=white)](https://github.com/mouziali75-cpu/scamguard/releases/tag/ven-15)
 
 ---
 
